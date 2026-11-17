@@ -14,13 +14,14 @@ DECLARE
 BEGIN
 
   -- ── Event 1: upcoming concert (published) ──────────────────────────────────
-  INSERT INTO events (id, name, date_time, venue, description, status, gate_pin, max_per_reservation)
+  INSERT INTO events (id, name, date_time, venue, description, cover_image_url, status, gate_pin, max_per_reservation)
   VALUES (
     event1_id,
     'Neon Nights Vol. 3',
     now() + interval '14 days',
     'Trace Expert City, Colombo 10',
     'A night of electronic music featuring Sri Lanka''s top DJs.',
+    'https://picsum.photos/seed/neon-nights/600/800',
     'published',
     'GATE01',
     6
