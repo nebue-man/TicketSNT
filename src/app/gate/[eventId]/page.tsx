@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import QRCode from 'react-qr-code'
-import { createUntypedClient } from '@/lib/supabase/untyped'
+import { getEventForGate } from '@/lib/data/events'
 import { GateScanner } from '@/components/gate/GateScanner'
 
 interface Props {
@@ -12,14 +12,8 @@ interface Props {
 export default async function GatePage({ params, searchParams }: Props) {
   const { eventId } = await params
   const { pin } = await searchParams
-  const supabase = await createUntypedClient()
 
-  const { data: event } = await supabase
-    .from('events')
-    .select('id, name, date_time, venue, status, gate_pin')
-    .eq('id', eventId)
-    .single()
-
+  const event = await getEventForGate(eventId)
   if (!event || event.status === 'archived') notFound()
 
   const eventDate = new Date(event.date_time)
@@ -32,13 +26,11 @@ export default async function GatePage({ params, searchParams }: Props) {
     timeZone: 'Asia/Colombo',
   })
 
-  // Build the gate QR URL (staff scan this to open the gate pre-authenticated)
   const headersList = await headers()
   const host = headersList.get('host') ?? 'localhost:3000'
   const proto = process.env.NODE_ENV === 'production' ? 'https' : 'http'
   const gateUrl = `${proto}://${host}/gate/${eventId}?pin=${event.gate_pin}`
 
-  // If PIN in URL is wrong, show error instead of gate
   const pinProvided = pin !== undefined
   const pinValid = pin === event.gate_pin
 
@@ -64,7 +56,6 @@ export default async function GatePage({ params, searchParams }: Props) {
           </p>
         </header>
 
-        {/* No PIN in URL — show the shareable QR for the organiser */}
         {!pinProvided && (
           <div>
             <p className="text-lime-spark font-semibold uppercase mb-6" style={{ fontSize: '14px', letterSpacing: '0.35px' }}>
@@ -82,7 +73,6 @@ export default async function GatePage({ params, searchParams }: Props) {
           </div>
         )}
 
-        {/* Wrong PIN */}
         {pinProvided && !pinValid && (
           <div>
             <p className="text-saffron-spark font-semibold uppercase mb-4" style={{ fontSize: '14px', letterSpacing: '0.35px' }}>
@@ -94,7 +84,6 @@ export default async function GatePage({ params, searchParams }: Props) {
           </div>
         )}
 
-        {/* Valid PIN — show scanner */}
         {pinProvided && pinValid && (
           <GateScanner eventId={eventId} pin={pin} />
         )}

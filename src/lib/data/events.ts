@@ -1,6 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import type { Event, TicketType } from '@/types/database'
 
+export async function getEventForGate(eventId: string): Promise<Event | null> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('id', eventId)
+    .single()
+  if (error || !data) return null
+  return data
+}
+
 export interface EventWithTicketTypes {
   event: Event
   ticketTypes: TicketType[]

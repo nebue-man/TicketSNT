@@ -1,4 +1,4 @@
-import { createUntypedClient } from '@/lib/supabase/untyped'
+import { createClient } from '@/lib/supabase/server'
 
 export type ScanResult =
   | { ok: true; reservation: ScannedReservation; alreadyScanned: false }
@@ -38,7 +38,7 @@ export async function scanReservation(
   eventId: string,
   gatePin: string
 ): Promise<ScanResult> {
-  const supabase = await createUntypedClient()
+  const supabase = await createClient()
 
   type RpcCall = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: ScanPayload | null; error: unknown }>
   const { data, error } = await (supabase.rpc as unknown as RpcCall)(
