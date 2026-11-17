@@ -13,6 +13,26 @@ export interface ScannedReservation {
   items: { ticket_type_name: string; quantity: number }[]
 }
 
+type ScanCode = 'admitted' | 'already_scanned' | 'invalid_pin' | 'not_found' | 'wrong_event' | 'voided'
+type ErrorCode = Extract<ScanResult, { ok: false }>['error']
+
+interface ScanPayload {
+  code: ScanCode
+  reservation_id?: string
+  buyer_name?: string
+  buyer_email?: string
+  buyer_phone?: string
+  items?: { ticket_type_name: string; quantity: number }[]
+  scanned_at?: string
+}
+
+const ERROR_CODES: Partial<Record<ScanCode, ErrorCode>> = {
+  invalid_pin: 'invalid_pin',
+  not_found:   'not_found',
+  wrong_event: 'wrong_event',
+  voided:      'voided',
+}
+
 export async function scanReservation(
   reservationId: string,
   eventId: string,
@@ -20,58 +40,27 @@ export async function scanReservation(
 ): Promise<ScanResult> {
   const supabase = await createUntypedClient()
 
-  const { data: event, error: eventError } = await supabase
-    .from('events')
-    .select('id, gate_pin')
-    .eq('id', eventId)
-    .single()
+  type RpcCall = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: ScanPayload | null; error: unknown }>
+  const { data, error } = await (supabase.rpc as unknown as RpcCall)(
+    'scan_reservation',
+    { p_reservation_id: reservationId, p_event_id: eventId, p_gate_pin: gatePin }
+  )
 
-  if (eventError || !event) return { ok: false, error: 'unknown' }
-  if (event.gate_pin !== gatePin) return { ok: false, error: 'invalid_pin' }
+  if (error || !data) return { ok: false, error: 'unknown' }
 
-  const { data: reservation, error: resError } = await supabase
-    .from('reservations')
-    .select('id, event_id, buyer_name, buyer_email, buyer_phone, status')
-    .eq('id', reservationId)
-    .single()
-
-  if (resError || !reservation) return { ok: false, error: 'not_found' }
-  if (reservation.event_id !== eventId) return { ok: false, error: 'wrong_event' }
-  if (reservation.status === 'void') return { ok: false, error: 'voided' }
-
-  const { data: items } = await supabase
-    .from('reservation_items')
-    .select('quantity, ticket_types(name)')
-    .eq('reservation_id', reservationId)
-
-  const scannedReservation: ScannedReservation = {
-    id: reservation.id,
-    buyer_name: reservation.buyer_name,
-    buyer_email: reservation.buyer_email,
-    buyer_phone: reservation.buyer_phone,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    items: (items ?? []).map((item: any) => ({
-      ticket_type_name: item.ticket_types?.name ?? 'Unknown',
-      quantity: item.quantity,
-    })),
+  if (data.code === 'admitted' || data.code === 'already_scanned') {
+    const reservation: ScannedReservation = {
+      id:          data.reservation_id!,
+      buyer_name:  data.buyer_name!,
+      buyer_email: data.buyer_email!,
+      buyer_phone: data.buyer_phone!,
+      items:       data.items ?? [],
+    }
+    if (data.code === 'already_scanned') {
+      return { ok: true, reservation, alreadyScanned: true, scannedAt: data.scanned_at! }
+    }
+    return { ok: true, reservation, alreadyScanned: false }
   }
 
-  const { data: existingScan } = await supabase
-    .from('scan_logs')
-    .select('scanned_at')
-    .eq('reservation_id', reservationId)
-    .eq('confirmed', true)
-    .order('scanned_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (existingScan) {
-    return { ok: true, reservation: scannedReservation, alreadyScanned: true, scannedAt: existingScan.scanned_at }
-  }
-
-  await supabase
-    .from('scan_logs')
-    .insert({ reservation_id: reservationId, confirmed: true })
-
-  return { ok: true, reservation: scannedReservation, alreadyScanned: false }
+  return { ok: false, error: ERROR_CODES[data.code] ?? 'unknown' }
 }
