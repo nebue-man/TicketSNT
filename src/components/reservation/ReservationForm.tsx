@@ -130,11 +130,11 @@ export function ReservationForm({ event, ticketTypes }: Props) {
 
   if (status === 'success') {
     return (
-      <div className="py-16">
+      <div className="py-16 animate-fade-in-up">
         <p className="text-lime-spark font-semibold uppercase mb-6" style={{ fontSize: '14px', letterSpacing: '0.35px' }}>
           Confirmed
         </p>
-        <h2 className="text-bone-white font-normal mb-6" style={{ fontSize: '36px', lineHeight: 1.2 }}>
+        <h2 className="text-bone-white font-normal mb-6" style={{ fontSize: '36px', lineHeight: 1.1, letterSpacing: '-0.02em' }}>
           You&apos;re on the list.
         </h2>
         <p className="text-ash-gray font-light mb-8" style={{ fontSize: '18px' }}>
@@ -142,7 +142,7 @@ export function ReservationForm({ event, ticketTypes }: Props) {
         </p>
 
         {/* QR code — white background required for scanner contrast */}
-        <div className="inline-block p-5 mb-8" style={{ background: '#ffffff', borderRadius: '16px' }}>
+        <div className="inline-block p-5 mb-8 animate-scale-in" style={{ background: '#ffffff', borderRadius: '16px' }}>
           <QRCode value={reservationId} size={200} bgColor="#ffffff" fgColor="#000000" />
         </div>
 
@@ -231,7 +231,7 @@ export function ReservationForm({ event, ticketTypes }: Props) {
           role="checkbox"
           aria-checked={consent}
           onClick={() => { setConsent(c => !c); setFieldErrors(p => ({ ...p, consent: undefined })) }}
-          className="mt-1 w-5 h-5 rounded border shrink-0 flex items-center justify-center transition-colors"
+          className="mt-1 w-5 h-5 rounded border shrink-0 flex items-center justify-center active:scale-90 transition-[transform,background-color,border-color] duration-100 ease-out"
           style={{
             borderColor: consent ? '#8052ff' : '#333',
             backgroundColor: consent ? '#8052ff' : 'transparent',
@@ -264,7 +264,7 @@ export function ReservationForm({ event, ticketTypes }: Props) {
       <button
         type="submit"
         disabled={status === 'submitting'}
-        className="inline-flex items-center justify-center bg-electric-iris text-bone-white font-semibold uppercase disabled:opacity-40 transition-opacity hover:opacity-90"
+        className="inline-flex items-center justify-center bg-electric-iris text-bone-white font-semibold uppercase disabled:opacity-40 hover:opacity-90 active:scale-[0.97] transition-[transform,opacity] duration-100 ease-out"
         style={{
           fontSize: '14px',
           letterSpacing: '0.025em',

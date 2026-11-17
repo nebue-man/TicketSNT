@@ -48,7 +48,7 @@ export default async function GatePage({ params, searchParams }: Props) {
           <p className="text-saffron-spark font-semibold uppercase mb-3" style={{ fontSize: '12px', letterSpacing: '0.35px' }}>
             {dateStr} · {timeStr}
           </p>
-          <h1 className="text-bone-white font-normal" style={{ fontSize: '27px', lineHeight: 1.2 }}>
+          <h1 className="text-bone-white font-normal" style={{ fontSize: '27px', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
             {event.name}
           </h1>
           <p className="text-ash-gray font-light mt-1" style={{ fontSize: '15px' }}>

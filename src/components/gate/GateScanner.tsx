@@ -139,7 +139,7 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
           <button
             onClick={() => { if (manualId.trim()) handleScan(manualId.trim()) }}
             disabled={!manualId.trim() || scanning}
-            className="text-electric-iris font-semibold uppercase disabled:opacity-30"
+            className="text-electric-iris font-semibold uppercase disabled:opacity-30 active:scale-95 transition-transform duration-100 ease-out"
             style={{ fontSize: '14px', letterSpacing: '0.025em' }}
           >
             Check
@@ -154,12 +154,12 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
 
   if (error || !result) {
     return (
-      <div>
+      <div className="animate-fade-in-up">
         <p className="text-saffron-spark font-semibold uppercase mb-4" style={{ fontSize: '14px', letterSpacing: '0.35px' }}>
           Not admitted
         </p>
-        <p className="text-bone-white font-normal mb-8" style={{ fontSize: '24px' }}>{error}</p>
-        <button onClick={resetToScan} className="inline-flex items-center justify-center bg-electric-iris text-bone-white font-semibold uppercase hover:opacity-90 transition-opacity"
+        <p className="text-bone-white font-normal mb-8" style={{ fontSize: '24px', letterSpacing: '-0.02em' }}>{error}</p>
+        <button onClick={resetToScan} className="inline-flex items-center justify-center bg-electric-iris text-bone-white font-semibold uppercase hover:opacity-90 active:scale-[0.97] transition-[transform,opacity] duration-100 ease-out"
           style={{ fontSize: '14px', letterSpacing: '0.025em', borderRadius: '24px', padding: '14px 32px' }}>
           Scan next
         </button>
@@ -171,7 +171,7 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
   const scannedAt = alreadyScanned ? new Date((result as { scannedAt: string }).scannedAt).toLocaleTimeString('en-LK', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Colombo' }) : null
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       <p
         className="font-semibold uppercase mb-4"
         style={{
@@ -182,7 +182,7 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
         {alreadyScanned ? `Already scanned · ${scannedAt}` : 'Admitted'}
       </p>
 
-      <h2 className="text-bone-white font-normal mb-1" style={{ fontSize: '27px', lineHeight: 1.2 }}>
+      <h2 className="text-bone-white font-normal mb-1 animate-scale-in" style={{ fontSize: '27px', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
         {reservation.buyer_name}
       </h2>
       <p className="text-ash-gray font-light mb-6" style={{ fontSize: '15px' }}>
@@ -198,7 +198,7 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
         ))}
       </div>
 
-      <button onClick={resetToScan} className="inline-flex items-center justify-center bg-electric-iris text-bone-white font-semibold uppercase hover:opacity-90 transition-opacity"
+      <button onClick={resetToScan} className="inline-flex items-center justify-center bg-electric-iris text-bone-white font-semibold uppercase hover:opacity-90 active:scale-[0.97] transition-[transform,opacity] duration-100 ease-out"
         style={{ fontSize: '14px', letterSpacing: '0.025em', borderRadius: '24px', padding: '14px 32px' }}>
         Scan next
       </button>

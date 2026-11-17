@@ -42,13 +42,13 @@ export function TicketTypeRow({ ticketType, quantity, onChange, max }: Props) {
           aria-label={`Decrease ${ticketType.name}`}
           disabled={quantity <= 0}
           onClick={() => onChange(ticketType.id, quantity - 1)}
-          className="w-8 h-8 rounded-full border border-ash-gray flex items-center justify-center text-bone-white disabled:opacity-20 hover:border-bone-white transition-colors"
+          className="w-8 h-8 rounded-full border border-ash-gray flex items-center justify-center text-bone-white disabled:opacity-20 hover:border-bone-white active:scale-90 transition-[transform,border-color] duration-100 ease-out"
           style={{ fontSize: '18px', lineHeight: 1 }}
         >
           −
         </button>
         <span
-          className="font-normal tabular-nums"
+          className="font-normal tabular-nums transition-colors duration-150"
           style={{ fontSize: '18px', minWidth: '20px', textAlign: 'center', color: quantity > 0 ? '#b9ff4b' : '#ffffff' }}
         >
           {quantity}
@@ -58,7 +58,7 @@ export function TicketTypeRow({ ticketType, quantity, onChange, max }: Props) {
           aria-label={`Increase ${ticketType.name}`}
           disabled={soldOut || quantity >= effectiveMax}
           onClick={() => onChange(ticketType.id, quantity + 1)}
-          className="w-8 h-8 rounded-full border border-ash-gray flex items-center justify-center text-bone-white disabled:opacity-20 hover:border-bone-white transition-colors"
+          className="w-8 h-8 rounded-full border border-ash-gray flex items-center justify-center text-bone-white disabled:opacity-20 hover:border-bone-white active:scale-90 transition-[transform,border-color] duration-100 ease-out"
           style={{ fontSize: '18px', lineHeight: 1 }}
         >
           +
