@@ -1,12 +1,14 @@
 import { notFound } from 'next/navigation'
 import { getEventWithTicketTypes } from '@/lib/data/events'
 import { ReservationForm } from '@/components/reservation/ReservationForm'
+import { requireAuth } from '@/lib/auth'
 
 interface Props {
   params: Promise<{ eventId: string }>
 }
 
 export default async function ReservePage({ params }: Props) {
+  await requireAuth()
   const { eventId } = await params
   const data = await getEventWithTicketTypes(eventId)
 

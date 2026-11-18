@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import QRCode from 'react-qr-code'
 import { getEventForGate } from '@/lib/data/events'
 import { GateScanner } from '@/components/gate/GateScanner'
+import { requireAuth } from '@/lib/auth'
 
 interface Props {
   params: Promise<{ eventId: string }>
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default async function GatePage({ params, searchParams }: Props) {
+  await requireAuth()
   const { eventId } = await params
   const { pin } = await searchParams
 
