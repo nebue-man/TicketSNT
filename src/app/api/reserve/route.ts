@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (event.status !== 'published') {
-    return NextResponse.json({ error: 'Event is not open for reservations' }, { status: 409 })
+    return NextResponse.json({ error: 'Event is not accepting reservations' }, { status: 400 })
   }
 
   const validation = validateReservationInput(body, event.max_per_reservation)

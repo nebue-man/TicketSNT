@@ -88,6 +88,12 @@ describe('validateReservationInput', () => {
     }
   })
 
+  it('trims buyer_nic', () => {
+    const result = validateReservationInput({ ...valid, buyer_nic: '  200012345678  ' }, 10)
+    expect(result.valid).toBe(true)
+    if (result.valid) expect(result.data.buyer_nic).toBe('200012345678')
+  })
+
   it('rejects non-object body', () => {
     const result = validateReservationInput(null, 10)
     expect(result.valid).toBe(false)
