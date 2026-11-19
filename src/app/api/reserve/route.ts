@@ -23,9 +23,17 @@ export async function POST(request: NextRequest) {
     .eq('id', eventId)
     .single()
 
+  if (eventError) {
+    if (eventError.code === 'PGRST116') {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    }
+    console.error('Event fetch error:', eventError)
+    return NextResponse.json({ error: 'Failed to load event' }, { status: 500 })
+  }
+
   const event = eventRow as { max_per_reservation: number; status: string } | null
 
-  if (eventError || !event) {
+  if (!event) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 })
   }
 

@@ -30,7 +30,7 @@ export interface Reservation {
   buyer_name: string
   buyer_email: string
   buyer_phone: string
-  nic: string | null
+  nic: string | null  // nullable for rows created before the nic column was added
   status: ReservationStatus
   created_at: string
 }
