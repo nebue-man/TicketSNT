@@ -55,6 +55,7 @@ function TierRow({ tier, eventId, onRefresh }: { tier: TicketType; eventId: stri
     const res = await fetch(`/api/admin/events/${eventId}/tiers/${tier.id}`, { method: 'DELETE' })
     const json = await res.json() as { error?: string }
     if (!res.ok) { setErr(json.error ?? 'Failed'); setDeleting(false); return }
+    setDeleting(false)
     onRefresh()
   }
 
@@ -84,7 +85,7 @@ function TierRow({ tier, eventId, onRefresh }: { tier: TicketType; eventId: stri
             style={{ fontSize: '13px' }}>
             {saving ? 'Saving…' : 'Save'}
           </button>
-          <button onClick={() => { setEditing(false); setErr('') }}
+          <button onClick={() => { setName(tier.name); setPrice(tier.price); setCapacity(tier.capacity); setEditing(false); setErr('') }}
             className="text-ash-gray hover:text-bone-white transition-colors font-light"
             style={{ fontSize: '13px' }}>
             Cancel
