@@ -4,23 +4,29 @@
 
 **Goal:** Transform the prototype into a working internal counter tool. Staff select an event, fill in buyer details (including NIC), download a branded ticket card with QR, and hand it to the buyer. An admin portal lets the client manage events, ticket tiers, and view/void reservations. The whole app is behind a single shared password.
 
-**Shared understanding source:** Grilling session 2026-11-18. Key decisions:
+**Shared understanding source:** Grilling sessions 2026-11-18 and 2026-11-19. Key decisions:
 - Staff counter tool (not self-serve)
 - QR delivered as downloaded PNG branded card
-- Single `ADMIN_PASSWORD` env var, HMAC session cookie, whole app protected
+- **Two-role auth (Option C):** `ADMIN_PASSWORD` unlocks everything (admin portal + counter); `STAFF_PASSWORD` unlocks counter tool only. One login page, role encoded in HMAC session token as `timestamp:role.mac`.
+- Admin API routes each call `requireAuth('admin')`; counter pages call `requireAuth()` (any role)
 - NIC / Passport No. required field, no format validation
 - Upcoming published events only on counter homepage
 - "Book next customer" button resets form but stays on same event
-- Void = status change only, sold count unchanged
+- Void = status change only, sold count unchanged (voided seats permanently consumed)
 - Admin: events CRUD + tier CRUD + dashboard + reservations list with search + void
-- Gate PIN auto-generated (6 uppercase hex chars), editable before save
+- Gate PIN auto-generated (6 uppercase hex chars) using `crypto.getRandomValues()`, editable before save
+- Minimal RLS: anon `SELECT` on `events`/`ticket_types` allowed; all writes go through service role client or existing `SECURITY DEFINER` RPCs
+- Admin data layer uses `createAdminClient()` (service role key); counter data layer keeps anon client
 
 **Architecture notes:**
 - `next.config.ts` is already server-rendered (no `output: 'export'`)
-- Middleware runs in Edge Runtime — uses cookie existence check only
-- Full HMAC token verification happens in `src/lib/auth.ts` (Node.js), called via `requireAuth()` in server components
-- Existing routes (`/reserve`, `/gate`, APIs) stay in place; `requireAuth()` added to their pages
-- Admin routes live under `src/app/admin/`
+- Middleware runs in Edge Runtime — uses cookie existence check only (no crypto)
+- Session token format: `timestamp:role.mac` — role (`admin`|`staff`) is baked into the HMAC-signed payload
+- Full token verification + role enforcement in `src/lib/auth.ts` (Node.js), called via `requireAuth(requiredRole?)` in server components and API routes
+- `requireAuth('admin')` redirects staff sessions to `/login`; post-login honours `?from=` param, falls back to `/admin/events` (admin) or `/` (staff)
+- Existing routes (`/reserve`, `/gate`, APIs) stay in place; `requireAuth()` (any role) added to their pages
+- Admin routes live under `src/app/admin/`; admin API routes under `/api/admin/` each call `requireAuth('admin')`
+- `src/lib/supabase/admin.ts` exports `createAdminClient()` using `SUPABASE_SERVICE_ROLE_KEY`
 
 ---
 
@@ -31,9 +37,11 @@
 | Modify | `.env.example` |
 | Create | `src/middleware.ts` |
 | Create | `src/lib/auth.ts` |
+| Create | `src/lib/supabase/admin.ts` |
 | Create | `src/app/login/page.tsx` |
 | Create | `src/app/api/auth/login/route.ts` |
 | Create | `src/app/api/auth/logout/route.ts` |
+| Create | `supabase/migrations/0005_enable_rls.sql` |
 | Create | `supabase/migrations/0004_add_nic_and_update_rpc.sql` |
 | Modify | `src/types/database.ts` |
 | Modify | `src/lib/utils/validate-reservation.ts` |
@@ -389,6 +397,242 @@ npm run build && npm run lint
 ```bash
 git add src/app/page.tsx "src/app/reserve/[eventId]/page.tsx" "src/app/gate/[eventId]/page.tsx"
 git commit -m "feat: protect existing pages with requireAuth()"
+```
+
+---
+
+## Task 0.4 — Two-role auth extension
+
+**Context:** Tasks 0.1–0.3 implemented single-password auth. This task extends it to two roles: `admin` (full access) and `staff` (counter only). Already-committed files are modified.
+
+**Files:** `src/lib/auth.ts`, `src/app/api/auth/login/route.ts`, `.env.example`
+
+- [ ] **Step 1: Update `.env.example`**
+
+Add `STAFF_PASSWORD` alongside `ADMIN_PASSWORD`:
+
+```
+# Admin auth
+ADMIN_PASSWORD=choose-a-strong-password
+STAFF_PASSWORD=choose-a-different-password
+SESSION_SECRET=generate-with-openssl-rand-hex-32
+```
+
+Also add `STAFF_PASSWORD` to `.env.local` with a real value.
+
+- [ ] **Step 2: Rewrite `src/lib/auth.ts`**
+
+Token format changes from `timestamp.mac` to `timestamp:role.mac`.
+
+```typescript
+import { createHmac } from 'crypto'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+export type SessionRole = 'admin' | 'staff'
+
+const SESSION_COOKIE = 'snt_session'
+const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
+
+export function createSessionToken(role: SessionRole): string {
+  const payload = `${Date.now()}:${role}`
+  const mac = createHmac('sha256', process.env.SESSION_SECRET!)
+    .update(payload)
+    .digest('hex')
+  return `${payload}.${mac}`
+}
+
+export function verifySessionToken(token: string): { valid: true; role: SessionRole } | { valid: false } {
+  const dotIdx = token.lastIndexOf('.')
+  if (dotIdx === -1) return { valid: false }
+  const payload = token.slice(0, dotIdx)
+  const mac = token.slice(dotIdx + 1)
+  const parts = payload.split(':')
+  if (parts.length !== 2) return { valid: false }
+  const [timestamp, role] = parts
+  if (role !== 'admin' && role !== 'staff') return { valid: false }
+  const age = Date.now() - parseInt(timestamp, 10)
+  if (isNaN(age) || age > SESSION_DURATION_MS) return { valid: false }
+  const expected = createHmac('sha256', process.env.SESSION_SECRET!)
+    .update(payload)
+    .digest('hex')
+  if (mac !== expected) return { valid: false }
+  return { valid: true, role: role as SessionRole }
+}
+
+export async function requireAuth(requiredRole?: SessionRole): Promise<void> {
+  const cookieStore = await cookies()
+  const token = cookieStore.get(SESSION_COOKIE)?.value
+  if (!token) redirect('/login')
+  const result = verifySessionToken(token)
+  if (!result.valid) redirect('/login')
+  if (requiredRole === 'admin' && result.role !== 'admin') redirect('/login')
+}
+
+export const SESSION_COOKIE_NAME = SESSION_COOKIE
+export const SESSION_MAX_AGE = 7 * 24 * 60 * 60
+```
+
+- [ ] **Step 3: Update `src/app/api/auth/login/route.ts`**
+
+Check both passwords and set the appropriate role in the token:
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server'
+import { createSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE } from '@/lib/auth'
+
+export async function POST(req: NextRequest) {
+  let body: { password?: string }
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+  }
+
+  await new Promise(r => setTimeout(r, 300))
+
+  let role: 'admin' | 'staff' | null = null
+  if (body.password === process.env.ADMIN_PASSWORD) role = 'admin'
+  else if (body.password === process.env.STAFF_PASSWORD) role = 'staff'
+
+  if (!role) {
+    return NextResponse.json({ error: 'Incorrect password' }, { status: 401 })
+  }
+
+  const token = createSessionToken(role)
+  const redirectTo = role === 'admin' ? '/admin/events' : '/'
+  const response = NextResponse.json({ ok: true, role, redirectTo })
+  response.cookies.set(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: SESSION_MAX_AGE,
+    path: '/',
+  })
+  return response
+}
+```
+
+- [ ] **Step 4: Update `src/app/login/page.tsx`**
+
+The `handleSubmit` function currently does `router.push(from)`. Update it to use the `redirectTo` from the API response, with `from` taking precedence:
+
+```typescript
+const json = await res.json()
+if (!res.ok) {
+  setError('Incorrect password')
+  setLoading(false)
+  return
+}
+// from param takes precedence; fall back to role-based default
+router.push(from !== '/' ? from : (json.redirectTo ?? '/'))
+router.refresh()
+```
+
+- [ ] **Step 5: Build and test**
+
+```bash
+npm run build
+```
+
+Verify: admin password → redirects to `/admin/events`; staff password → redirects to `/`; staff session attempting `/admin/events` → redirects to `/login`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add .env.example src/lib/auth.ts src/app/api/auth/login/route.ts src/app/login/page.tsx
+git commit -m "feat: two-role auth — admin and staff passwords, role in HMAC token"
+```
+
+---
+
+## Task 0.5 — Admin Supabase client (service role)
+
+**Context:** Admin data layer writes (create event, update tier, void reservation) need the service role key to bypass RLS once it is enabled. Counter-side reads keep the anon client.
+
+**Files:** `src/lib/supabase/admin.ts`
+
+- [ ] **Step 1: Create `src/lib/supabase/admin.ts`**
+
+```typescript
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
+
+export function createAdminClient() {
+  return createSupabaseClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
+```
+
+> **Note:** `SUPABASE_SERVICE_ROLE_KEY` is a server-only secret. This file must only be imported from server-side code (API routes, server components, data layer functions). Never import it from `'use client'` components.
+
+- [ ] **Step 2: Update all `src/lib/data/admin/` functions**
+
+When these files are created in Tasks 2.2–3.1, they must import `createAdminClient` from `@/lib/supabase/admin` instead of `createClient` from `@/lib/supabase/server`.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/lib/supabase/admin.ts
+git commit -m "feat: createAdminClient using service role key for admin data layer"
+```
+
+---
+
+## Task 0.6 — RLS migration
+
+**Context:** No RLS policies exist. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is exposed in the browser bundle — without RLS, anyone with the key can query and mutate the database directly. Minimal policy: anon `SELECT` on public data, all writes blocked for anon (covered by existing `SECURITY DEFINER` RPCs and the new service role client).
+
+**Files:** `supabase/migrations/0005_enable_rls.sql`
+
+- [ ] **Step 1: Create `supabase/migrations/0005_enable_rls.sql`**
+
+```sql
+-- Enable RLS on all tables
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ticket_types ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reservation_items ENABLE ROW LEVEL SECURITY;
+
+-- Anon can read published events and their ticket types (counter homepage + reserve page)
+CREATE POLICY "anon_read_events"
+  ON events FOR SELECT
+  TO anon
+  USING (true);
+
+CREATE POLICY "anon_read_ticket_types"
+  ON ticket_types FOR SELECT
+  TO anon
+  USING (true);
+
+-- All writes on reservations and reservation_items go through SECURITY DEFINER RPCs
+-- (create_reservation, scan_reservation) which run as the function owner, bypassing RLS.
+-- No direct anon write policies needed.
+
+-- service_role bypasses RLS entirely — admin client writes work without additional policies.
+```
+
+- [ ] **Step 2: Apply migration**
+
+```bash
+supabase db push
+```
+
+- [ ] **Step 3: Verify counter flow still works**
+
+```bash
+npm run dev
+```
+
+Navigate to the counter homepage — events should load. Submit a reservation — should succeed via the `SECURITY DEFINER` RPC.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add supabase/migrations/0005_enable_rls.sql
+git commit -m "feat: enable RLS — anon read-only, writes via service role and SECURITY DEFINER RPCs"
 ```
 
 ---
@@ -1319,11 +1563,13 @@ git commit -m "feat: add NIC field, branded QR card download, book-next-customer
 
 - [ ] **Step 1: Create `src/lib/utils/generate-pin.ts`**
 
-```typescript
-import { randomBytes } from 'crypto'
+Uses `crypto.getRandomValues()` (available in both browser and Node 19+) so it can be called from client components:
 
+```typescript
 export function generatePin(): string {
-  return randomBytes(3).toString('hex').toUpperCase()
+  const bytes = new Uint8Array(3)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
 }
 ```
 
@@ -1460,11 +1706,15 @@ git commit -m "feat: admin events data layer"
 
 - [ ] **Step 1: Create `src/app/api/admin/events/route.ts`** — POST create event
 
+> **Auth:** Every admin API route handler must call `await requireAuth('admin')` as its first line. Import it from `@/lib/auth`.
+
 ```typescript
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { createEvent } from '@/lib/data/admin/events'
 
 export async function POST(req: NextRequest) {
+  await requireAuth('admin')
   const body = await req.json() as Record<string, unknown>
 
   const name = typeof body.name === 'string' ? body.name.trim() : ''
@@ -1493,9 +1743,11 @@ export async function POST(req: NextRequest) {
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { updateEvent, closeEvent } from '@/lib/data/admin/events'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await requireAuth('admin')
   const { id } = await params
   const body = await req.json() as Record<string, unknown>
   const ok = await updateEvent(id, body)
@@ -1504,6 +1756,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await requireAuth('admin')
   const { id } = await params
   const body = await req.json() as { action?: string }
   if (body.action === 'close') {
@@ -1764,7 +2017,7 @@ export async function deleteTier(id: string): Promise<{ ok: boolean; error?: str
 
 `src/app/api/admin/events/[id]/tiers/[tierId]/route.ts` — `PATCH` updates, `DELETE` removes (checks sold > 0).
 
-Both follow the same pattern as the events API routes — parse body, call data layer, return JSON.
+Both follow the same pattern as the events API routes — call `await requireAuth('admin')` first, then parse body, call data layer, return JSON.
 
 - [ ] **Step 3: Create `src/app/admin/events/[id]/tiers/page.tsx`**
 
@@ -1992,9 +2245,11 @@ git commit -m "feat: admin event dashboard — capacity stats per tier"
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth'
 import { voidReservation } from '@/lib/data/admin/reservations'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await requireAuth('admin')
   const { id } = await params
   const ok = await voidReservation(id)
   if (!ok) return NextResponse.json({ error: 'Failed to void reservation' }, { status: 500 })
@@ -2223,6 +2478,9 @@ git commit -m "feat: admin reservations list — search, void action"
 - [ ] `npm run lint` passes clean
 - [ ] `npm test` passes clean
 - [ ] Whole app redirects to `/login` when no session cookie is present
+- [ ] Staff password → counter tool only; admin password → counter + admin portal
+- [ ] Staff session attempting `/admin/*` → redirected to `/login`
 - [ ] Counter flow: select event → book with NIC → download branded PNG card → "Book next customer" resets form
 - [ ] Admin: create event with auto-PIN, add tiers, view dashboard, search/void reservations
-- [ ] Gate scanner unchanged and functional
+- [ ] Gate scanner functional; requires either role to access
+- [ ] RLS enabled; direct anon writes to Supabase blocked
