@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const description = typeof body.description === 'string' ? body.description.trim() : ''
   const cover_image_url = typeof body.cover_image_url === 'string' && body.cover_image_url.trim()
     ? body.cover_image_url.trim() : null
-  const max_per_reservation = typeof body.max_per_reservation === 'number'
+  const max_per_reservation = typeof body.max_per_reservation === 'number' && body.max_per_reservation >= 1
     ? body.max_per_reservation : 6
   const gate_pin = typeof body.gate_pin === 'string' ? body.gate_pin.trim().toUpperCase() : ''
   const status = body.status === 'published' ? 'published' : 'draft' as const

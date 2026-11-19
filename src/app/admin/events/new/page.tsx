@@ -140,7 +140,7 @@ export default function NewEventPage() {
             min={1}
             max={20}
             value={maxPer}
-            onChange={e => setMaxPer(Number(e.target.value))}
+            onChange={e => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 1) setMaxPer(v) }}
             className={inputClass}
             style={{ fontSize: '18px' }}
           />
