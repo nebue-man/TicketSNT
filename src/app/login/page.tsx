@@ -22,13 +22,14 @@ function LoginForm() {
       body: JSON.stringify({ password }),
     })
 
+    const json = await res.json()
     if (!res.ok) {
       setError('Incorrect password')
       setLoading(false)
       return
     }
-
-    router.push(from)
+    // from param takes precedence over role-based default
+    router.push(from !== '/' ? from : (json.redirectTo ?? '/'))
     router.refresh()
   }
 

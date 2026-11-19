@@ -9,13 +9,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 
-  if (body.password !== process.env.ADMIN_PASSWORD) {
-    await new Promise(r => setTimeout(r, 300))
+  await new Promise(r => setTimeout(r, 300))
+
+  let role: 'admin' | 'staff' | null = null
+  if (body.password === process.env.ADMIN_PASSWORD) role = 'admin'
+  else if (body.password === process.env.STAFF_PASSWORD) role = 'staff'
+
+  if (!role) {
     return NextResponse.json({ error: 'Incorrect password' }, { status: 401 })
   }
 
-  const token = createSessionToken()
-  const response = NextResponse.json({ ok: true })
+  const token = createSessionToken(role)
+  const redirectTo = role === 'admin' ? '/admin/events' : '/'
+  const response = NextResponse.json({ ok: true, role, redirectTo })
   response.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
