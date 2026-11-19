@@ -85,7 +85,8 @@ async function downloadTicketCard(params: {
   const canvas = document.createElement('canvas')
   canvas.width = W
   canvas.height = H
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
 
   // Background
   ctx.fillStyle = '#000000'
@@ -308,7 +309,7 @@ export function ReservationForm({ event, ticketTypes }: Props) {
               venue: event.venue,
               dateStr,
               items: submittedItems,
-            })}
+            }).catch(err => console.error('Ticket download failed', err))}
             className="inline-flex items-center justify-center gap-2 bg-electric-iris text-bone-white font-semibold uppercase hover:opacity-90 active:scale-[0.97] transition-[transform,opacity] duration-100 ease-out"
             style={{ fontSize: '14px', letterSpacing: '0.025em', borderRadius: '24px', padding: '14px 32px' }}
           >
@@ -374,18 +375,23 @@ export function ReservationForm({ event, ticketTypes }: Props) {
       </section>
 
       <div className="flex gap-4 mb-12">
-        <button type="button" role="checkbox" aria-checked={consent}
-          onClick={() => { setConsent(c => !c); setFieldErrors(p => ({ ...p, consent: undefined })) }}
-          className="mt-1 w-5 h-5 rounded border shrink-0 flex items-center justify-center active:scale-90 transition-[transform,background-color,border-color] duration-100 ease-out"
-          style={{ borderColor: consent ? '#8052ff' : '#333', backgroundColor: consent ? '#8052ff' : 'transparent' }}>
-          {consent && (
-            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-              <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          )}
-        </button>
-        <label className="text-ash-gray font-light cursor-pointer" style={{ fontSize: '15px', lineHeight: 1.5 }}
-          onClick={() => { setConsent(c => !c); setFieldErrors(p => ({ ...p, consent: undefined })) }}>
+        <div className="relative mt-1 shrink-0">
+          <input
+            type="checkbox" id="consent" checked={consent}
+            onChange={e => { setConsent(e.target.checked); setFieldErrors(p => ({ ...p, consent: undefined })) }}
+            className="sr-only"
+          />
+          <label htmlFor="consent"
+            className="block w-5 h-5 rounded border cursor-pointer flex items-center justify-center active:scale-90 transition-[transform,background-color,border-color] duration-100 ease-out"
+            style={{ borderColor: consent ? '#8052ff' : '#333', backgroundColor: consent ? '#8052ff' : 'transparent' }}>
+            {consent && (
+              <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden="true">
+                <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </label>
+        </div>
+        <label htmlFor="consent" className="text-ash-gray font-light cursor-pointer" style={{ fontSize: '15px', lineHeight: 1.5 }}>
           Buyer consents to their details being used to process this reservation.
         </label>
       </div>
