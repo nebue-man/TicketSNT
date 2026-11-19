@@ -40,3 +40,15 @@ export async function getEventWithTicketTypes(
 
   return { event, ticketTypes }
 }
+
+export async function getUpcomingEvents(): Promise<Event[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('status', 'published')
+    .gte('date_time', new Date().toISOString())
+    .order('date_time', { ascending: true })
+  if (error || !data) return []
+  return data
+}
