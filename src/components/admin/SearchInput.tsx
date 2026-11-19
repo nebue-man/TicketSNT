@@ -1,14 +1,16 @@
 'use client'
 
 import { useRouter, usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export function SearchInput({ defaultValue }: { defaultValue?: string }) {
   const router = useRouter()
   const pathname = usePathname()
   const [value, setValue] = useState(defaultValue ?? '')
+  const isFirstRender = useRef(true)
 
   useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
     const timer = setTimeout(() => {
       const url = value.trim()
         ? `${pathname}?q=${encodeURIComponent(value.trim())}`

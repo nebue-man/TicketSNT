@@ -18,11 +18,14 @@ export function ReservationRow({ reservation: r }: Props) {
     if (!confirm(`Void reservation ${r.id}? This cannot be undone.`)) return
     setVoiding(true)
     setErr('')
-    const res = await fetch(`/api/admin/reservations/${r.id}/void`, { method: 'POST' })
-    const json = await res.json() as { error?: string }
-    if (!res.ok) { setErr(json.error ?? 'Failed to void'); setVoiding(false); return }
-    setVoiding(false)
-    router.refresh()
+    try {
+      const res = await fetch(`/api/admin/reservations/${r.id}/void`, { method: 'POST' })
+      const json = await res.json() as { error?: string }
+      if (!res.ok) { setErr(json.error ?? 'Failed to void'); return }
+      router.refresh()
+    } finally {
+      setVoiding(false)
+    }
   }
 
   const created = new Date(r.created_at).toLocaleString('en-LK', {
@@ -64,8 +67,8 @@ export function ReservationRow({ reservation: r }: Props) {
             </span>
           </div>
           <div className="mt-2 flex flex-wrap gap-3">
-            {r.items.map((item, i) => (
-              <span key={i} className="text-saffron-spark font-semibold" style={{ fontSize: '12px' }}>
+            {r.items.map(item => (
+              <span key={item.ticket_type_name} className="text-saffron-spark font-semibold" style={{ fontSize: '12px' }}>
                 {item.quantity}× {item.ticket_type_name}
               </span>
             ))}
