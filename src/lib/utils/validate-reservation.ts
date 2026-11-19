@@ -7,6 +7,7 @@ export interface ReservationInput {
   buyer_name: string
   buyer_email: string
   buyer_phone: string
+  buyer_nic: string
   items: ReservationInputItem[]
   consent: boolean
 }
@@ -35,6 +36,10 @@ export function validateReservationInput(
 
   if (typeof r.buyer_phone !== 'string' || !r.buyer_phone.trim()) {
     return { valid: false, error: 'Phone is required' }
+  }
+
+  if (typeof r.buyer_nic !== 'string' || !r.buyer_nic.trim()) {
+    return { valid: false, error: 'NIC / Passport No. is required' }
   }
 
   if (!Array.isArray(r.items) || r.items.length === 0) {
@@ -76,6 +81,7 @@ export function validateReservationInput(
       buyer_name: (r.buyer_name as string).trim(),
       buyer_email: (r.buyer_email as string).trim().toLowerCase(),
       buyer_phone: (r.buyer_phone as string).trim(),
+      buyer_nic: (r.buyer_nic as string).trim(),
       items: r.items as ReservationInputItem[],
       consent: true,
     },

@@ -5,6 +5,7 @@ const valid = {
   buyer_name: 'Alice Perera',
   buyer_email: 'alice@example.com',
   buyer_phone: '0771234567',
+  buyer_nic: '200012345678',
   items: [{ ticket_type_id: 'type-abc', quantity: 2 }],
   consent: true,
 }
@@ -34,6 +35,17 @@ describe('validateReservationInput', () => {
 
   it('rejects missing phone', () => {
     const result = validateReservationInput({ ...valid, buyer_phone: '' }, 10)
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejects missing NIC', () => {
+    const result = validateReservationInput({ ...valid, buyer_nic: '' }, 10)
+    expect(result.valid).toBe(false)
+    if (!result.valid) expect(result.error).toMatch(/nic/i)
+  })
+
+  it('rejects NIC that is only whitespace', () => {
+    const result = validateReservationInput({ ...valid, buyer_nic: '   ' }, 10)
     expect(result.valid).toBe(false)
   })
 

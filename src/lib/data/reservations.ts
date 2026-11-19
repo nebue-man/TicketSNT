@@ -23,6 +23,7 @@ export async function createReservation(
       p_buyer_name: input.buyer_name,
       p_buyer_email: input.buyer_email,
       p_buyer_phone: input.buyer_phone,
+      p_buyer_nic: input.buyer_nic,
       p_items: input.items,
     }
   )

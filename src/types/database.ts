@@ -30,6 +30,7 @@ export interface Reservation {
   buyer_name: string
   buyer_email: string
   buyer_phone: string
+  nic: string | null
   status: ReservationStatus
   created_at: string
 }
@@ -64,6 +65,7 @@ export type Database = {
           p_buyer_name: string
           p_buyer_email: string
           p_buyer_phone: string
+          p_buyer_nic: string
           p_items: { ticket_type_id: string; quantity: number }[]
         }
         Returns: string
