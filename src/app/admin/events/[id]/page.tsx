@@ -92,11 +92,8 @@ export default async function EventDashboardPage({ params }: { params: Promise<{
         </div>
         <div className="w-full h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
           <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${pct}%`,
-              backgroundColor: pct >= 90 ? '#ffb829' : '#b9ff4b',
-            }}
+            className={`h-full rounded-full transition-all duration-500 ${pct >= 90 ? 'bg-saffron-spark' : 'bg-lime-spark'}`}
+            style={{ width: `${pct}%` }}
           />
         </div>
         <p className="text-ash-gray font-light mt-3" style={{ fontSize: '13px' }}>

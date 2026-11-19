@@ -58,9 +58,9 @@ export async function getReservationsForEvent(
   if (error || !data) return []
 
   return (data as Record<string, unknown>[]).map(r => {
-    const rawItems = r.reservation_items as { quantity: number; ticket_types: { name: string } }[] | null
+    const rawItems = r.reservation_items as { quantity: number; ticket_types: { name: string } | null }[] | null
     const items = (rawItems ?? []).map(i => ({
-      ticket_type_name: i.ticket_types.name,
+      ticket_type_name: i.ticket_types?.name ?? '(deleted)',
       quantity: i.quantity,
     }))
     return { ...(r as unknown as Reservation), items }
