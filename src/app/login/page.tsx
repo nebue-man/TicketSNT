@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const from = searchParams.get('from') ?? '/'
+  const from = searchParams.get('from')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -29,7 +29,7 @@ function LoginForm() {
       return
     }
     // from param takes precedence over role-based default
-    router.push(from !== '/' ? from : (json.redirectTo ?? '/'))
+    router.push(from ?? json.redirectTo ?? '/')
     router.refresh()
   }
 
