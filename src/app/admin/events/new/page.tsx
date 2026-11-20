@@ -21,24 +21,30 @@ export default function NewEventPage() {
     e.preventDefault()
     setSubmitting(true)
     setError('')
-
-    const res = await fetch('/api/admin/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name,
-        date_time: dateTime,
-        venue,
-        description,
-        cover_image_url: coverUrl || null,
-        max_per_reservation: maxPer,
-        gate_pin: pin,
-        status: publish ? 'published' : 'draft',
-      }),
-    })
-    const json = await res.json() as { id?: string; error?: string }
-    if (!res.ok) { setError(json.error ?? 'Failed'); setSubmitting(false); return }
-    router.push(`/admin/events/${json.id}/tiers`)
+    try {
+      const res = await fetch('/api/admin/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          date_time: dateTime,
+          venue,
+          description,
+          cover_image_url: coverUrl || null,
+          max_per_reservation: maxPer,
+          gate_pin: pin,
+          status: publish ? 'published' : 'draft',
+        }),
+      })
+      if (res.status === 401 || res.redirected) { setError('Admin access required. Please sign in with the admin password.'); return }
+      const json = await res.json() as { id?: string; error?: string }
+      if (!res.ok) { setError(json.error ?? 'Failed'); return }
+      router.push(`/admin/events/${json.id}/tiers`)
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const inputClass = 'w-full bg-transparent border-b border-[#333] text-bone-white font-light pb-3 outline-none focus:border-electric-iris transition-colors placeholder:text-[#444]'
