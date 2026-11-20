@@ -43,11 +43,15 @@ export async function getAdminEvent(id: string): Promise<Event | null> {
   return data as Event
 }
 
-export async function createEvent(insert: EventInsert): Promise<{ id: string } | null> {
+export async function createEvent(insert: EventInsert): Promise<{ id: string } | { error: string }> {
   const supabase = createAdminClient() as unknown as SupabaseAny
   const { data, error } = await supabase
     .from('events').insert(insert).select('id').single()
-  if (error || !data) return null
+  if (error || !data) {
+    const msg = (error as { message?: string } | null)?.message ?? 'Unknown error'
+    console.error('[createEvent] supabase error:', error)
+    return { error: msg }
+  }
   return data as { id: string }
 }
 
