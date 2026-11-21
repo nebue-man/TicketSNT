@@ -43,11 +43,14 @@ export async function createEvent(insert: EventInsert): Promise<{ id: string } |
     p_gate_pin:            insert.gate_pin,
     p_status:              insert.status,
   })
+  console.log('[createEvent] rpc result — data:', JSON.stringify(data), 'error:', JSON.stringify(error))
   if (error) {
-    console.error('[createEvent] rpc error:', error)
     return { error: (error as { message?: string }).message ?? 'Failed to create event' }
   }
-  return { id: data as string }
+  // Supabase returns scalar uuid as a plain string, but guard against objects
+  const id = typeof data === 'string' ? data : (data as Record<string, string> | null)?.id ?? null
+  if (!id) return { error: 'RPC returned no ID — check Netlify logs' }
+  return { id }
 }
 
 export async function updateEvent(id: string, patch: Partial<EventInsert>): Promise<boolean> {
