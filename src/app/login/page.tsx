@@ -30,7 +30,7 @@ function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password, role }),
       })
-      let json: { ok?: boolean; error?: string; redirectTo?: string } = {}
+      let json: { ok?: boolean; error?: string; redirectTo?: string; role?: string } = {}
       try { json = await res.json() } catch { /* non-JSON response */ }
       if (!res.ok) {
         setError(json.error ?? 'Incorrect password')
