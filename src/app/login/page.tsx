@@ -7,30 +7,39 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const from = searchParams.get('from')
+  const [role, setRole] = useState<'staff' | 'admin'>('staff')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  function switchRole(next: 'staff' | 'admin') {
+    setRole(next)
+    setPassword('')
+    setError('')
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
-
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
-    })
-
-    const json = await res.json()
-    if (!res.ok) {
-      setError('Incorrect password')
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, role }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error ?? 'Incorrect password')
+        return
+      }
+      router.push(from ?? json.redirectTo ?? '/')
+      router.refresh()
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
       setLoading(false)
-      return
     }
-    // from param takes precedence over role-based default
-    router.push(from ?? json.redirectTo ?? '/')
-    router.refresh()
   }
 
   return (
@@ -47,8 +56,33 @@ function LoginForm() {
             className="text-bone-white font-normal"
             style={{ fontSize: '28px', lineHeight: 1.2, letterSpacing: '-0.02em' }}
           >
-            Staff access
+            Sign in
           </h1>
+        </div>
+
+        {/* Role toggle */}
+        <div
+          className="flex mb-8 p-1 rounded-full"
+          style={{ backgroundColor: '#1a1a1a', border: '1px solid #2a2a2a' }}
+        >
+          {(['staff', 'admin'] as const).map(r => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => switchRole(r)}
+              className="flex-1 font-semibold uppercase transition-all duration-200"
+              style={{
+                fontSize: '11px',
+                letterSpacing: '0.35px',
+                padding: '8px 0',
+                borderRadius: '20px',
+                backgroundColor: role === r ? '#7c3aed' : 'transparent',
+                color: role === r ? '#fff' : '#555',
+              }}
+            >
+              {r === 'staff' ? 'Staff' : 'Admin'}
+            </button>
+          ))}
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -57,7 +91,7 @@ function LoginForm() {
             className="block text-ash-gray font-semibold uppercase mb-3"
             style={{ fontSize: '11px', letterSpacing: '0.35px' }}
           >
-            Password
+            {role === 'admin' ? 'Admin password' : 'Staff password'}
           </label>
           <input
             id="password"
@@ -87,7 +121,7 @@ function LoginForm() {
               padding: '14px 32px',
             }}
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Signing in…' : `Sign in as ${role}`}
           </button>
         </form>
       </div>

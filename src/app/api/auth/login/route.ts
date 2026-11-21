@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSessionToken, SESSION_COOKIE_NAME, SESSION_MAX_AGE } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
-  let body: { password?: string }
+  let body: { password?: string; role?: string }
   try {
     body = await req.json()
   } catch {
@@ -11,9 +11,11 @@ export async function POST(req: NextRequest) {
 
   await new Promise(r => setTimeout(r, 300))
 
+  const hintedRole = body.role === 'admin' || body.role === 'staff' ? body.role : null
+
   let role: 'admin' | 'staff' | null = null
-  if (body.password === process.env.ADMIN_PASSWORD) role = 'admin'
-  else if (body.password === process.env.STAFF_PASSWORD) role = 'staff'
+  if (body.password === process.env.ADMIN_PASSWORD && (!hintedRole || hintedRole === 'admin')) role = 'admin'
+  else if (body.password === process.env.STAFF_PASSWORD && (!hintedRole || hintedRole === 'staff')) role = 'staff'
 
   if (!role) {
     return NextResponse.json({ error: 'Incorrect password' }, { status: 401 })
