@@ -12,19 +12,6 @@ export type EventInsert = {
   status: EventStatus
 }
 
-// Supabase's typed client does not infer insert/update argument shapes correctly
-// for this schema (args resolve to `never`), so write operations cast through unknown.
-type WriteResult = { data: unknown; error: { message: string } | null }
-type AnyTable = PromiseLike<WriteResult> & {
-  select: (cols: string) => AnyTable
-  insert: (row: unknown) => AnyTable
-  update: (patch: unknown) => AnyTable
-  eq: (col: string, val: unknown) => AnyTable
-  order: (col: string, opts?: { ascending: boolean }) => AnyTable
-  single: () => PromiseLike<WriteResult>
-}
-type SupabaseAny = { from: (table: string) => AnyTable }
-
 export async function getAllEvents(): Promise<Event[]> {
   const supabase = createAdminClient()
   const { data, error } = await supabase
@@ -44,48 +31,49 @@ export async function getAdminEvent(id: string): Promise<Event | null> {
 }
 
 export async function createEvent(insert: EventInsert): Promise<{ id: string } | { error: string }> {
-  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/+$/, '')
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  console.log('[createEvent] baseUrl:', baseUrl, '| keyPrefix:', serviceKey?.slice(0, 15))
-
-  const res = await fetch(`${baseUrl}/rest/v1/events`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': serviceKey,
-      'Authorization': `Bearer ${serviceKey}`,
-      'Prefer': 'return=representation',
-    },
-    body: JSON.stringify(insert),
+  const supabase = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc('admin_create_event', {
+    p_name:                insert.name,
+    p_date_time:           insert.date_time,
+    p_venue:               insert.venue,
+    p_description:         insert.description,
+    p_cover_image_url:     insert.cover_image_url,
+    p_max_per_reservation: insert.max_per_reservation,
+    p_gate_pin:            insert.gate_pin,
+    p_status:              insert.status,
   })
-
-  const text = await res.text()
-  console.log('[createEvent] status:', res.status, '| body:', text.slice(0, 200))
-
-  if (!res.ok) {
-    let msg = `HTTP ${res.status}`
-    try { msg = (JSON.parse(text) as { message?: string }).message ?? msg } catch { /* not JSON */ }
-    return { error: msg }
+  if (error) {
+    console.error('[createEvent] rpc error:', error)
+    return { error: (error as { message?: string }).message ?? 'Failed to create event' }
   }
-
-  try {
-    const rows = JSON.parse(text) as { id: string }[]
-    if (!rows[0]?.id) return { error: 'No ID returned from insert' }
-    return { id: rows[0].id }
-  } catch {
-    return { error: 'Unexpected response from database' }
-  }
+  return { id: data as string }
 }
 
 export async function updateEvent(id: string, patch: Partial<EventInsert>): Promise<boolean> {
-  const supabase = createAdminClient() as unknown as SupabaseAny
-  const { error } = await supabase.from('events').update(patch).eq('id', id)
+  const current = await getAdminEvent(id)
+  if (!current) return false
+  const supabase = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).rpc('admin_update_event', {
+    p_id:                  id,
+    p_name:                patch.name               ?? current.name,
+    p_date_time:           patch.date_time          ?? current.date_time,
+    p_venue:               patch.venue              ?? current.venue,
+    p_description:         patch.description        ?? current.description,
+    p_cover_image_url:     patch.cover_image_url    ?? current.cover_image_url,
+    p_max_per_reservation: patch.max_per_reservation ?? current.max_per_reservation,
+    p_gate_pin:            patch.gate_pin           ?? current.gate_pin,
+    p_status:              patch.status             ?? current.status,
+  })
+  if (error) console.error('[updateEvent] rpc error:', error)
   return !error
 }
 
 export async function closeEvent(id: string): Promise<boolean> {
-  const supabase = createAdminClient() as unknown as SupabaseAny
-  const { error } = await supabase
-    .from('events').update({ status: 'closed' }).eq('id', id)
+  const supabase = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).rpc('admin_close_event', { p_id: id })
+  if (error) console.error('[closeEvent] rpc error:', error)
   return !error
 }

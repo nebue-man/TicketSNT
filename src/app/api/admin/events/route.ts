@@ -21,7 +21,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'name, date_time, venue, gate_pin are required' }, { status: 422 })
   }
 
-  console.log('[events POST] SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
   const result = await createEvent({ name, date_time, venue, description, cover_image_url, max_per_reservation, gate_pin, status })
   if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
 

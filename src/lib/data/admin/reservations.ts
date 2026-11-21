@@ -1,14 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Reservation } from '@/types/database'
 
-// Supabase typed client resolves .update() args as `never` for this schema.
-type WriteResult = { data: unknown; error: { message: string } | null }
-type AnyTable = PromiseLike<WriteResult> & {
-  select: (cols: string) => AnyTable
-  update: (patch: unknown) => AnyTable
-  eq: (col: string, val: unknown) => AnyTable
-}
-type SupabaseAny = { from: (table: string) => AnyTable }
 
 export interface TierStat {
   id: string
@@ -68,8 +60,9 @@ export async function getReservationsForEvent(
 }
 
 export async function voidReservation(id: string): Promise<boolean> {
-  const sb = createAdminClient() as unknown as SupabaseAny
-  const { error } = await sb
-    .from('reservations').update({ status: 'void' }).eq('id', id)
+  const supabase = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).rpc('admin_void_reservation', { p_id: id })
+  if (error) console.error('[voidReservation] rpc error:', error)
   return !error
 }
