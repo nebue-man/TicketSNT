@@ -36,7 +36,11 @@ function LoginForm() {
         setError(json.error ?? 'Incorrect password')
         return
       }
-      router.push(from ?? json.redirectTo ?? '/')
+      // Admin always lands on the dashboard; staff recovers the page they came from.
+      const destination = json.role === 'admin'
+        ? '/admin/events'
+        : (from ?? json.redirectTo ?? '/')
+      router.push(destination)
       router.refresh()
     } catch {
       setError('Network error — please try again.')
