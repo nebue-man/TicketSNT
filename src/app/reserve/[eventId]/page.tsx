@@ -12,7 +12,7 @@ export default async function ReservePage({ params }: Props) {
   const { eventId } = await params
   const data = await getEventWithTicketTypes(eventId)
 
-  if (!data || data.event.status !== 'published') notFound()
+  if (!data || data.event.status === 'closed' || data.event.status === 'archived') notFound()
 
   const { event, ticketTypes } = data
 

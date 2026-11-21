@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateReservationInput } from '@/lib/utils/validate-reservation'
 import { createReservation } from '@/lib/data/reservations'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import type { Event } from '@/types/database'
 
 export async function POST(request: NextRequest) {
   let body: unknown
@@ -16,28 +17,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'eventId is required' }, { status: 400 })
   }
 
-  const supabase = await createClient()
-  const { data: eventRow, error: eventError } = await supabase
-    .from('events')
-    .select('max_per_reservation, status')
-    .eq('id', eventId)
-    .single()
+  const supabase = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: eventRows, error: eventError } = await (supabase as any).rpc('admin_get_event', { p_id: eventId })
 
   if (eventError) {
-    if (eventError.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
-    }
     console.error('Event fetch error:', eventError)
     return NextResponse.json({ error: 'Failed to load event' }, { status: 500 })
   }
 
-  const event = eventRow as { max_per_reservation: number; status: string } | null
+  const event = ((eventRows as Event[] | null)?.[0]) ?? null
 
   if (!event) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 })
   }
 
-  if (event.status !== 'published') {
+  if (event.status === 'closed' || event.status === 'archived') {
     return NextResponse.json({ error: 'Event is not accepting reservations' }, { status: 400 })
   }
 

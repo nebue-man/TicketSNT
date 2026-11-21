@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export type ScanResult =
   | { ok: true; reservation: ScannedReservation; alreadyScanned: false }
@@ -38,10 +38,11 @@ export async function scanReservation(
   eventId: string,
   gatePin: string
 ): Promise<ScanResult> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type RpcCall = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: ScanPayload | null; error: unknown }>
-  const { data, error } = await (supabase.rpc as unknown as RpcCall)(
+  const { data, error } = await ((supabase as any).rpc as unknown as RpcCall)(
     'scan_reservation',
     { p_reservation_id: reservationId, p_event_id: eventId, p_gate_pin: gatePin }
   )

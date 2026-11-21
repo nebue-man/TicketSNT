@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { generateReservationId } from '@/lib/utils/reservation-id'
 import type { ReservationInput } from '@/lib/utils/validate-reservation'
 
@@ -10,12 +10,13 @@ export async function createReservation(
   eventId: string,
   input: ReservationInput
 ): Promise<ReservationResult> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const reservationId = generateReservationId()
 
   // rpc args cast needed until types are generated from local schema
   type RpcResult = { data: string | null; error: { message: string } | null }
-  const { data, error } = await (supabase.rpc as unknown as (fn: string, args: Record<string, unknown>) => PromiseLike<RpcResult>)(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await ((supabase as any).rpc as unknown as (fn: string, args: Record<string, unknown>) => PromiseLike<RpcResult>)(
     'create_reservation',
     {
       p_id: reservationId,
