@@ -7,10 +7,12 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const from = searchParams.get('from')
-  const [role, setRole] = useState<'staff' | 'admin'>('staff')
+  const roleParam = searchParams.get('role')
+  const [role, setRole] = useState<'staff' | 'admin'>(roleParam === 'admin' ? 'admin' : 'staff')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const needsAdmin = roleParam === 'admin'
 
   function switchRole(next: 'staff' | 'admin') {
     setRole(next)
@@ -59,6 +61,11 @@ function LoginForm() {
           >
             Sign in
           </h1>
+          {needsAdmin && (
+            <p className="text-saffron-spark font-light mt-3" style={{ fontSize: '13px' }}>
+              Admin access required. Please sign in as Admin.
+            </p>
+          )}
         </div>
 
         {/* Role toggle */}

@@ -34,14 +34,23 @@ export function verifySessionToken(token: string): { valid: true; role: SessionR
 }
 
 // No argument = any authenticated role (staff or admin).
-// Pass 'admin' to restrict access to admin sessions only — staff sessions redirect to /login.
+// Pass 'admin' to restrict access to admin sessions only — staff sessions redirect to /login?role=admin.
 export async function requireAuth(requiredRole?: SessionRole): Promise<void> {
   const cookieStore = await cookies()
   const token = cookieStore.get(SESSION_COOKIE)?.value
   if (!token) redirect('/login')
   const result = verifySessionToken(token)
   if (!result.valid) redirect('/login')
-  if (requiredRole === 'admin' && result.role !== 'admin') redirect('/login')
+  if (requiredRole === 'admin' && result.role !== 'admin') redirect('/login?role=admin')
+}
+
+// Returns the role of the current session, or null if unauthenticated/invalid.
+export async function getSessionRole(): Promise<SessionRole | null> {
+  const cookieStore = await cookies()
+  const token = cookieStore.get(SESSION_COOKIE)?.value
+  if (!token) return null
+  const result = verifySessionToken(token)
+  return result.valid ? result.role : null
 }
 
 export const SESSION_COOKIE_NAME = SESSION_COOKIE

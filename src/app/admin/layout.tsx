@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { requireAuth } from '@/lib/auth'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await requireAuth()
+  await requireAuth('admin')
 
   return (
     <div className="min-h-screen bg-void">

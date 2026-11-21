@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, getSessionRole } from '@/lib/auth'
 import { getUpcomingEvents } from '@/lib/data/events'
 import type { Event } from '@/types/database'
 
@@ -38,7 +38,7 @@ function EventCard({ event }: { event: Event }) {
 
 export default async function HomePage() {
   await requireAuth()
-  const events = await getUpcomingEvents()
+  const [events, role] = await Promise.all([getUpcomingEvents(), getSessionRole()])
 
   return (
     <main className="min-h-screen bg-void px-6 py-16">
@@ -68,11 +68,14 @@ export default async function HomePage() {
 
         {events.length === 0 ? (
           <p className="text-ash-gray font-light" style={{ fontSize: '15px' }}>
-            No upcoming events. Create one in the{' '}
-            <Link href="/admin/events" className="text-electric-iris hover:underline">
-              admin portal
-            </Link>
-            .
+            No upcoming events.{role === 'admin' && (
+              <> Create one in the{' '}
+                <Link href="/admin/events" className="text-electric-iris hover:underline">
+                  admin portal
+                </Link>
+                .
+              </>
+            )}
           </p>
         ) : (
           <div className="flex flex-col gap-4">
@@ -82,15 +85,17 @@ export default async function HomePage() {
           </div>
         )}
 
-        <div className="mt-16 pt-8 border-t border-[#1a1a1a]">
-          <Link
-            href="/admin"
-            className="text-ash-gray font-light hover:text-bone-white transition-colors"
-            style={{ fontSize: '13px' }}
-          >
-            Admin portal →
-          </Link>
-        </div>
+        {role === 'admin' && (
+          <div className="mt-16 pt-8 border-t border-[#1a1a1a]">
+            <Link
+              href="/admin"
+              className="text-ash-gray font-light hover:text-bone-white transition-colors"
+              style={{ fontSize: '13px' }}
+            >
+              Admin portal →
+            </Link>
+          </div>
+        )}
 
       </div>
     </main>
