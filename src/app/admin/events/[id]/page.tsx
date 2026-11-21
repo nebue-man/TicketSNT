@@ -68,6 +68,13 @@ export default async function EventDashboardPage({ params }: { params: Promise<{
             Reservations
           </Link>
           <Link
+            href={`/gate/${id}`}
+            className="text-ash-gray hover:text-bone-white transition-colors font-light"
+            style={{ fontSize: '13px' }}
+          >
+            Gate
+          </Link>
+          <Link
             href={`/admin/events/${id}/edit`}
             className="text-ash-gray hover:text-bone-white transition-colors font-light"
             style={{ fontSize: '13px' }}
