@@ -3,18 +3,26 @@
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
+const ROLE_LABELS = {
+  staff: { pill: 'Staff', password: 'Staff password', submit: 'Sign in as staff' },
+  admin: { pill: 'Admin', password: 'Admin password', submit: 'Sign in as admin' },
+  gate:  { pill: 'Gate',  password: 'Gate password',  submit: 'Open gate scanner' },
+} as const
+
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const from = searchParams.get('from')
   const roleParam = searchParams.get('role')
-  const [role, setRole] = useState<'staff' | 'admin'>(roleParam === 'admin' ? 'admin' : 'staff')
+  const [role, setRole] = useState<'staff' | 'admin' | 'gate'>(
+    roleParam === 'admin' ? 'admin' : roleParam === 'gate' ? 'gate' : 'staff'
+  )
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const needsAdmin = roleParam === 'admin'
 
-  function switchRole(next: 'staff' | 'admin') {
+  function switchRole(next: 'staff' | 'admin' | 'gate') {
     setRole(next)
     setPassword('')
     setError('')
@@ -77,7 +85,7 @@ function LoginForm() {
           className="flex mb-8 p-1 rounded-full"
           style={{ backgroundColor: '#1a1a1a', border: '1px solid #2a2a2a' }}
         >
-          {(['staff', 'admin'] as const).map(r => (
+          {(['staff', 'admin', 'gate'] as const).map(r => (
             <button
               key={r}
               type="button"
@@ -92,7 +100,7 @@ function LoginForm() {
                 color: role === r ? '#fff' : '#555',
               }}
             >
-              {r === 'staff' ? 'Staff' : 'Admin'}
+              {ROLE_LABELS[r].pill}
             </button>
           ))}
         </div>
@@ -103,7 +111,7 @@ function LoginForm() {
             className="block text-ash-gray font-semibold uppercase mb-3"
             style={{ fontSize: '11px', letterSpacing: '0.35px' }}
           >
-            {role === 'admin' ? 'Admin password' : 'Staff password'}
+            {ROLE_LABELS[role].password}
           </label>
           <input
             id="password"
@@ -133,7 +141,7 @@ function LoginForm() {
               padding: '14px 32px',
             }}
           >
-            {loading ? 'Signing in…' : `Sign in as ${role}`}
+            {loading ? 'Signing in…' : ROLE_LABELS[role].submit}
           </button>
         </form>
       </div>

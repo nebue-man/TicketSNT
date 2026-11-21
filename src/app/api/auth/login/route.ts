@@ -11,11 +11,12 @@ export async function POST(req: NextRequest) {
 
   await new Promise(r => setTimeout(r, 300))
 
-  const hintedRole = body.role === 'admin' || body.role === 'staff' ? body.role : null
+  const hintedRole = body.role === 'admin' || body.role === 'staff' || body.role === 'gate' ? body.role : null
 
-  let role: 'admin' | 'staff' | null = null
+  let role: 'admin' | 'staff' | 'gate' | null = null
   if (body.password === process.env.ADMIN_PASSWORD && (!hintedRole || hintedRole === 'admin')) role = 'admin'
   else if (body.password === process.env.STAFF_PASSWORD && (!hintedRole || hintedRole === 'staff')) role = 'staff'
+  else if (body.password === process.env.GATE_PASSWORD && (!hintedRole || hintedRole === 'gate')) role = 'gate'
 
   if (!role) {
     return NextResponse.json({ error: 'Incorrect password' }, { status: 401 })

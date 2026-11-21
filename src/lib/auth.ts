@@ -1,8 +1,9 @@
 import { createHmac } from 'crypto'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
+import { VALID_ROLES, type SessionRole } from './auth-roles'
 
-export type SessionRole = 'admin' | 'staff'
+export type { SessionRole } from './auth-roles'
 
 const SESSION_COOKIE = 'snt_session'
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
@@ -23,7 +24,7 @@ export function verifySessionToken(token: string): { valid: true; role: SessionR
   const parts = payload.split(':')
   if (parts.length !== 2) return { valid: false }
   const [timestamp, role] = parts
-  if (role !== 'admin' && role !== 'staff') return { valid: false }
+  if (!VALID_ROLES.includes(role as SessionRole)) return { valid: false }
   const age = Date.now() - parseInt(timestamp, 10)
   if (isNaN(age) || age > SESSION_DURATION_MS) return { valid: false }
   const expected = createHmac('sha256', process.env.SESSION_SECRET!)
@@ -33,8 +34,8 @@ export function verifySessionToken(token: string): { valid: true; role: SessionR
   return { valid: true, role: role as SessionRole }
 }
 
-// No argument = any authenticated role (staff or admin).
-// Pass 'admin' to restrict access to admin sessions only — staff sessions redirect to /login?role=admin.
+// No argument = any authenticated role (staff, admin, or gate).
+// Pass 'admin' to restrict access to admin sessions only — staff/gate sessions redirect to /login?role=admin.
 export async function requireAuth(requiredRole?: SessionRole): Promise<void> {
   const cookieStore = await cookies()
   const token = cookieStore.get(SESSION_COOKIE)?.value
