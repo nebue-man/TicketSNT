@@ -44,15 +44,37 @@ export async function getAdminEvent(id: string): Promise<Event | null> {
 }
 
 export async function createEvent(insert: EventInsert): Promise<{ id: string } | { error: string }> {
-  const supabase = createAdminClient() as unknown as SupabaseAny
-  const { data, error } = await supabase
-    .from('events').insert(insert).select('id').single()
-  if (error || !data) {
-    const msg = (error as { message?: string } | null)?.message ?? 'Unknown error'
-    console.error('[createEvent] supabase error:', error)
+  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/+$/, '')
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+  console.log('[createEvent] baseUrl:', baseUrl, '| keyPrefix:', serviceKey?.slice(0, 15))
+
+  const res = await fetch(`${baseUrl}/rest/v1/events`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': serviceKey,
+      'Authorization': `Bearer ${serviceKey}`,
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(insert),
+  })
+
+  const text = await res.text()
+  console.log('[createEvent] status:', res.status, '| body:', text.slice(0, 200))
+
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`
+    try { msg = (JSON.parse(text) as { message?: string }).message ?? msg } catch { /* not JSON */ }
     return { error: msg }
   }
-  return data as { id: string }
+
+  try {
+    const rows = JSON.parse(text) as { id: string }[]
+    if (!rows[0]?.id) return { error: 'No ID returned from insert' }
+    return { id: rows[0].id }
+  } catch {
+    return { error: 'Unexpected response from database' }
+  }
 }
 
 export async function updateEvent(id: string, patch: Partial<EventInsert>): Promise<boolean> {
