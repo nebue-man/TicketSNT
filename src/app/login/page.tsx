@@ -28,7 +28,8 @@ function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password, role }),
       })
-      const json = await res.json()
+      let json: { ok?: boolean; error?: string; redirectTo?: string } = {}
+      try { json = await res.json() } catch { /* non-JSON response */ }
       if (!res.ok) {
         setError(json.error ?? 'Incorrect password')
         return
@@ -36,7 +37,7 @@ function LoginForm() {
       router.push(from ?? json.redirectTo ?? '/')
       router.refresh()
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError('Network error — please try again.')
     } finally {
       setLoading(false)
     }
