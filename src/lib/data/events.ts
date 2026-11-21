@@ -43,11 +43,12 @@ export async function getEventWithTicketTypes(
 
 export async function getUpcomingEvents(): Promise<Event[]> {
   const supabase = await createClient()
+  // Staff see all draft and published events (not closed/archived).
+  // No date filter — staff may need to book tickets on the day of the event.
   const { data, error } = await supabase
     .from('events')
     .select('*')
-    .eq('status', 'published')
-    .gte('date_time', new Date().toISOString())
+    .in('status', ['published', 'draft'])
     .order('date_time', { ascending: true })
   if (error || !data) return []
   return data
