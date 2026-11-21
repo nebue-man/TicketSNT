@@ -14,20 +14,19 @@ export type EventInsert = {
 
 export async function getAllEvents(): Promise<Event[]> {
   const supabase = createAdminClient()
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .order('date_time', { ascending: false })
-  if (error || !data) return []
-  return data as Event[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc('admin_get_all_events')
+  if (error) console.error('[getAllEvents] rpc error:', JSON.stringify(error))
+  return (data as Event[] | null) ?? []
 }
 
 export async function getAdminEvent(id: string): Promise<Event | null> {
   const supabase = createAdminClient()
-  const { data, error } = await supabase
-    .from('events').select('*').eq('id', id).single()
-  if (error || !data) return null
-  return data as Event
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc('admin_get_event', { p_id: id })
+  if (error) console.error('[getAdminEvent] id:', id, 'rpc error:', JSON.stringify(error))
+  const rows = data as Event[] | null
+  return rows?.[0] ?? null
 }
 
 export async function createEvent(insert: EventInsert): Promise<{ id: string } | { error: string }> {

@@ -3,10 +3,10 @@ import type { TicketType } from '@/types/database'
 
 export async function getTiersForEvent(eventId: string): Promise<TicketType[]> {
   const supabase = createAdminClient()
-  const { data, error } = await supabase
-    .from('ticket_types').select('*').eq('event_id', eventId).order('sort_order')
-  if (error || !data) return []
-  return data as TicketType[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc('admin_get_tiers', { p_event_id: eventId })
+  if (error) console.error('[getTiersForEvent] rpc error:', JSON.stringify(error))
+  return (data as TicketType[] | null) ?? []
 }
 
 export async function createTier(eventId: string, tier: {
@@ -31,8 +31,9 @@ export async function updateTier(id: string, patch: {
   const supabase = createAdminClient()
 
   // Read current values to fill in unchanged fields
-  const { data: current } = await supabase
-    .from('ticket_types').select('name, price, capacity').eq('id', id).single()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: tierRows } = await (supabase as any).rpc('admin_get_tier', { p_id: id })
+  const current = (tierRows as TicketType[] | null)?.[0]
   if (!current) return { ok: false, error: 'Tier not found' }
   const row = current as { name: string; price: number; capacity: number }
 

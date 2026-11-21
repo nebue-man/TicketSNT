@@ -13,13 +13,10 @@ export interface TierStat {
 
 export async function getEventStats(eventId: string): Promise<TierStat[]> {
   const supabase = createAdminClient()
-  const { data, error } = await supabase
-    .from('ticket_types')
-    .select('id, name, price, capacity, sold')
-    .eq('event_id', eventId)
-    .order('sort_order')
-  if (error || !data) return []
-  return (data as { id: string; name: string; price: number; capacity: number; sold: number }[])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc('admin_get_tiers', { p_event_id: eventId })
+  if (error) console.error('[getEventStats] rpc error:', JSON.stringify(error))
+  return ((data as { id: string; name: string; price: number; capacity: number; sold: number }[] | null) ?? [])
     .map(t => ({ ...t, remaining: t.capacity - t.sold }))
 }
 
