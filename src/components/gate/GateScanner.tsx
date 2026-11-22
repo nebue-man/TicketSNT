@@ -27,13 +27,13 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
 
     async function startCamera() {
       try {
-        const { BrowserMultiFormatReader } = await import('@zxing/browser')
-        const reader = new BrowserMultiFormatReader()
+        const { BrowserQRCodeReader } = await import('@zxing/browser')
+        const reader = new BrowserQRCodeReader()
         const videoEl = videoRef.current
         if (!videoEl) return
 
         const controls = await reader.decodeFromConstraints(
-          { video: { facingMode: 'environment' } },
+          { video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } },
           videoEl,
           (result, err) => {
             if (stopped) return
