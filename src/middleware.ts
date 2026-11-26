@@ -43,8 +43,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Gate sessions may only access /gate/* routes.
-  if (role === 'gate' && !pathname.startsWith('/gate')) {
+  // Gate sessions may only access the gate pages and the gate API they call.
+  if (role === 'gate' && !pathname.startsWith('/gate') && !pathname.startsWith('/api/gate')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
