@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { createHmac } from 'crypto'
 import { NextRequest } from 'next/server'
-import { middleware } from './middleware'
+import { middleware, config } from './middleware'
 import type { SessionRole } from './lib/auth-roles'
 
 const SECRET = 'test-secret'
@@ -64,5 +64,20 @@ describe('middleware — other roles and no session', () => {
   it('leaves the login page and auth API public', async () => {
     expect(await run('/login')).toEqual({ allowed: true })
     expect(await run('/api/auth/login', undefined, 'POST')).toEqual({ allowed: true })
+  })
+})
+
+describe('middleware matcher', () => {
+  // Next.js anchors matcher patterns to the whole path.
+  const matches = (path: string) => config.matcher.some(m => new RegExp(`^${m}$`).test(path))
+
+  it('skips the QR decoder .wasm so the scanner can load it', () => {
+    expect(matches('/zxing/zxing_reader.wasm')).toBe(false)
+  })
+
+  it('still checks sessions on pages and APIs', () => {
+    for (const path of ['/', '/gate/evt-1', '/api/gate/scan', '/admin/events', '/zxing']) {
+      expect(matches(path)).toBe(true)
+    }
   })
 })

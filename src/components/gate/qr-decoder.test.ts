@@ -1,6 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import * as zxing from '@zxing/library'
-import { rgbaToLuminance, createLuminanceDecoder } from './qr-decoder'
+import * as zxingWasm from 'zxing-wasm/reader'
+import { rgbaToLuminance, createLuminanceDecoder, createWasmImageDecoder, ZXING_WASM_PATH } from './qr-decoder'
+
+const require = createRequire(import.meta.url)
+const packageWasmPath = require.resolve('zxing-wasm/reader/zxing_reader.wasm')
 
 const SIZE = 480
 
@@ -50,5 +57,47 @@ describe('createLuminanceDecoder', () => {
     expect(decode(a, SIZE)).toBe('RES-AAAAAA')
     expect(decode(new Uint8ClampedArray(SIZE * SIZE).fill(200), SIZE)).toBeNull()
     expect(decode(b, SIZE)).toBe('RES-BBBBBB')
+  })
+})
+
+/** Node has no ImageData; zxing-wasm only needs width/height/data. */
+function imageData(rgba: Uint8ClampedArray): ImageData {
+  return { data: rgba, width: SIZE, height: SIZE, colorSpace: 'srgb' } as ImageData
+}
+
+describe('WebAssembly decoder (zxing-wasm)', () => {
+  beforeAll(async () => {
+    const wasmBinary = readFileSync(packageWasmPath)
+    await zxingWasm.prepareZXingModule({
+      overrides: { wasmBinary: wasmBinary.buffer.slice(wasmBinary.byteOffset, wasmBinary.byteOffset + wasmBinary.byteLength) },
+      fireImmediately: true,
+    })
+  })
+
+  const decode = createWasmImageDecoder(zxingWasm)
+
+  it('decodes a Reservation ID QR from a cropped frame', async () => {
+    expect(await decode(imageData(frameWithQr('RES-AB12CD')))).toBe('RES-AB12CD')
+  })
+
+  it('decodes a small QR (ticket held further from the camera)', async () => {
+    expect(await decode(imageData(frameWithQr('RES-ZZ99XY', 120)))).toBe('RES-ZZ99XY')
+  })
+
+  it('returns null for a frame with no QR', async () => {
+    expect(await decode(imageData(new Uint8ClampedArray(SIZE * SIZE * 4).fill(200)))).toBeNull()
+  })
+
+  it('decodes consecutive frames', async () => {
+    expect(await decode(imageData(frameWithQr('RES-AAAAAA')))).toBe('RES-AAAAAA')
+    expect(await decode(imageData(new Uint8ClampedArray(SIZE * SIZE * 4).fill(200)))).toBeNull()
+    expect(await decode(imageData(frameWithQr('RES-BBBBBB')))).toBe('RES-BBBBBB')
+  })
+})
+
+describe('served .wasm file', () => {
+  it('public/zxing matches the installed zxing-wasm package (run npm install if this fails)', () => {
+    const served = readFileSync(join(process.cwd(), 'public', ZXING_WASM_PATH))
+    expect(served.equals(readFileSync(packageWasmPath))).toBe(true)
   })
 })

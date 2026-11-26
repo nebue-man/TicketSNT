@@ -52,5 +52,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon\\.ico).*)'],
+  // zxing/ holds the gate scanner's QR decoder (.wasm) — a public static asset.
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|zxing/).*)'],
 }
