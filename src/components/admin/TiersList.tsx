@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import type { TicketType } from '@/types/database'
+import { NumberInput } from '@/components/NumberInput'
 
 interface Props {
   tiers: TicketType[]
@@ -71,11 +72,11 @@ function TierRow({ tier, eventId, onRefresh }: { tier: TicketType; eventId: stri
           </div>
           <div className="w-32">
             <label className="block text-ash-gray font-semibold uppercase mb-2" style={{ fontSize: '11px', letterSpacing: '0.35px' }}>Price (LKR)</label>
-            <input type="number" min={0} value={price} onChange={e => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 0) setPrice(v) }} className={inputClass} style={{ fontSize: '15px', width: '100%' }} />
+            <NumberInput min={0} value={price} onChange={setPrice} className={inputClass} style={{ fontSize: '15px', width: '100%' }} />
           </div>
           <div className="w-32">
             <label className="block text-ash-gray font-semibold uppercase mb-2" style={{ fontSize: '11px', letterSpacing: '0.35px' }}>Capacity</label>
-            <input type="number" min={tier.sold} value={capacity} onChange={e => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 1) setCapacity(v) }} className={inputClass} style={{ fontSize: '15px', width: '100%' }} />
+            <NumberInput min={Math.max(1, tier.sold)} value={capacity} onChange={setCapacity} className={inputClass} style={{ fontSize: '15px', width: '100%' }} />
           </div>
         </div>
         {err && <p className="text-saffron-spark mb-3" style={{ fontSize: '12px' }}>{err}</p>}
