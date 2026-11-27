@@ -13,6 +13,16 @@ function toDateTimeLocal(isoString: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+type Action = 'close' | 'archive' | 'restore' | 'delete'
+
+const CONFIRM: Record<Action, string> = {
+  close: 'Close this event? Ticket sales stop. This cannot be undone.',
+  archive: 'Archive this event? It will be hidden from your events list, but all reservations, scans and door counts are kept.\n\n' +
+    'Make sure every gate phone that used offline mode has uploaded its scans first.',
+  restore: 'Restore this event? It goes back in your events list as closed.',
+  delete: 'Delete this event permanently? Its ticket tiers are deleted too. This cannot be undone.',
+}
+
 export default function EditEventForm({ event }: { event: Event }) {
   const router = useRouter()
   const [name, setName] = useState(event.name)
@@ -24,8 +34,10 @@ export default function EditEventForm({ event }: { event: Event }) {
   const [pin, setPin] = useState(event.gate_pin)
   const [publish, setPublish] = useState(event.status === 'published')
   const [submitting, setSubmitting] = useState(false)
-  const [closing, setClosing] = useState(false)
+  const [busy, setBusy] = useState<Action | null>(null)
   const [error, setError] = useState('')
+  const isClosed = event.status === 'closed' || event.status === 'archived'
+  const isArchived = event.status === 'archived'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -43,7 +55,8 @@ export default function EditEventForm({ event }: { event: Event }) {
           cover_image_url: coverUrl || null,
           max_per_reservation: maxPer,
           gate_pin: pin,
-          status: publish ? 'published' : 'draft',
+          // Closed and archived events keep their status; sending the toggle would reset them to draft.
+          ...(isClosed ? {} : { status: publish ? 'published' : 'draft' }),
         }),
       })
       if (res.status === 401 || res.redirected) { setError('Admin access required. Please sign in with the admin password.'); return }
@@ -57,31 +70,33 @@ export default function EditEventForm({ event }: { event: Event }) {
     }
   }
 
-  async function handleClose() {
-    if (!window.confirm('Close this event? This cannot be undone.')) return
-    setClosing(true)
+  async function runAction(action: Action) {
+    if (!window.confirm(CONFIRM[action])) return
+    setBusy(action)
     setError('')
     try {
-      const res = await fetch(`/api/admin/events/${event.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'close' }),
-      })
+      const res = action === 'delete'
+        ? await fetch(`/api/admin/events/${event.id}`, { method: 'DELETE' })
+        : await fetch(`/api/admin/events/${event.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action }),
+          })
       if (res.status === 401 || res.redirected) { setError('Admin access required. Please sign in with the admin password.'); return }
       const json = await res.json() as { ok?: boolean; error?: string }
       if (!res.ok) { setError(json.error ?? 'Failed'); return }
-      router.push('/admin/events')
+      if (action === 'restore') router.refresh()
+      else router.push('/admin/events')
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
-      setClosing(false)
+      setBusy(null)
     }
   }
 
   const inputClass = 'w-full bg-transparent border-b border-[#333] text-bone-white font-light pb-3 outline-none focus:border-electric-iris transition-colors placeholder:text-[#444]'
   const labelClass = 'block text-ash-gray font-semibold uppercase mb-3'
-
-  const isClosed = event.status === 'closed' || event.status === 'archived'
+  const linkButton = 'hover:opacity-80 transition-opacity font-light disabled:opacity-50'
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-10 max-w-[600px]">
@@ -199,8 +214,8 @@ export default function EditEventForm({ event }: { event: Event }) {
         </div>
       </div>
 
-      {/* Publish toggle */}
-      <div>
+      {/* Publish toggle (closed and archived events keep their status) */}
+      {!isClosed && <div>
         <label className="flex items-center gap-3 cursor-pointer">
           <div className="relative">
             <input
@@ -222,7 +237,7 @@ export default function EditEventForm({ event }: { event: Event }) {
             Published
           </span>
         </label>
-      </div>
+      </div>}
 
       {error && (
         <p className="text-saffron-spark font-light" style={{ fontSize: '14px' }}>
@@ -242,11 +257,11 @@ export default function EditEventForm({ event }: { event: Event }) {
         {!isClosed && (
           <button
             type="button"
-            disabled={closing}
-            onClick={handleClose}
-            className="text-saffron-spark hover:opacity-80 transition-opacity font-light disabled:opacity-50"
+            disabled={busy !== null}
+            onClick={() => runAction('close')}
+            className={`text-saffron-spark ${linkButton}`}
             style={{ fontSize: '13px' }}>
-            {closing ? 'Closing…' : 'Close event'}
+            {busy === 'close' ? 'Closing…' : 'Close event'}
           </button>
         )}
 
@@ -257,6 +272,40 @@ export default function EditEventForm({ event }: { event: Event }) {
           style={{ fontSize: '13px' }}>
           Cancel
         </button>
+      </div>
+
+      {/* Archive / restore / delete */}
+      <div className="flex flex-col gap-5 pt-8 border-t border-[#1a1a1a]">
+        {isArchived ? (
+          <div>
+            <button type="button" disabled={busy !== null} onClick={() => runAction('restore')}
+              className={`text-bone-white ${linkButton}`} style={{ fontSize: '13px' }}>
+              {busy === 'restore' ? 'Restoring…' : 'Restore event'}
+            </button>
+            <p className="text-ash-gray font-light mt-1" style={{ fontSize: '12px' }}>
+              This event is archived. Restoring puts it back in your events list as closed.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <button type="button" disabled={busy !== null} onClick={() => runAction('archive')}
+              className={`text-bone-white ${linkButton}`} style={{ fontSize: '13px' }}>
+              {busy === 'archive' ? 'Archiving…' : 'Archive event'}
+            </button>
+            <p className="text-ash-gray font-light mt-1" style={{ fontSize: '12px' }}>
+              For an event that has ended. Hides it from your events list and keeps all its records.
+            </p>
+          </div>
+        )}
+        <div>
+          <button type="button" disabled={busy !== null} onClick={() => runAction('delete')}
+            className={`text-saffron-spark ${linkButton}`} style={{ fontSize: '13px' }}>
+            {busy === 'delete' ? 'Deleting…' : 'Delete event'}
+          </button>
+          <p className="text-ash-gray font-light mt-1" style={{ fontSize: '12px' }}>
+            For an event made by mistake. Only works while it has no reservations.
+          </p>
+        </div>
       </div>
     </form>
   )
