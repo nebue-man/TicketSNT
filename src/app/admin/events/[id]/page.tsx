@@ -6,17 +6,7 @@ import { getDoorCount } from '@/lib/data/admin/door-count'
 import { DoorCountCard } from '@/components/admin/DoorCountCard'
 import { getOfflineScanIssues } from '@/lib/data/gate-offline'
 import { OfflineScanIssues } from '@/components/admin/OfflineScanIssues'
-import type { EventStatus } from '@/types/database'
-
-function statusColor(status: EventStatus): string {
-  const colors: Record<EventStatus, string> = {
-    published: '#b9ff4b',
-    draft: '#9a9a9a',
-    closed: '#ffb829',
-    archived: '#444',
-  }
-  return colors[status]
-}
+import { StatusBadge } from '@/components/admin/StatusBadge'
 
 export default async function EventDashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -40,125 +30,77 @@ export default async function EventDashboardPage({ params }: { params: Promise<{
 
   return (
     <div>
-      <div className="flex items-start justify-between mb-10">
-        <div>
-          <span
-            className="font-semibold uppercase"
-            style={{ fontSize: '11px', letterSpacing: '0.35px', color: statusColor(event.status) }}
-          >
-            {event.status}
-          </span>
-          <h1
-            className="text-bone-white font-normal mt-2"
-            style={{ fontSize: '28px', lineHeight: 1.2, letterSpacing: '-0.02em' }}
-          >
-            {event.name}
-          </h1>
-          <p className="text-ash-gray font-light mt-1" style={{ fontSize: '14px' }}>
-            {event.venue} · {eventDate}
-          </p>
+      <div className="flex flex-wrap items-end justify-between gap-6 mb-8">
+        <div className="min-w-0">
+          <StatusBadge status={event.status} />
+          <h1 className="h1 mt-2">{event.name}</h1>
+          <p className="meta mt-1">{event.venue} · {eventDate}</p>
         </div>
-        <div className="flex gap-4 shrink-0 mt-1">
-          <Link
-            href={`/admin/events/${id}/tiers`}
-            className="text-ash-gray hover:text-bone-white transition-colors font-light"
-            style={{ fontSize: '13px' }}
-          >
-            Tiers
-          </Link>
-          <Link
-            href={`/admin/events/${id}/reservations`}
-            className="text-electric-iris hover:opacity-80 transition-opacity font-light"
-            style={{ fontSize: '13px' }}
-          >
-            Reservations
-          </Link>
-          <Link
-            href={`/gate/${id}`}
-            className="text-ash-gray hover:text-bone-white transition-colors font-light"
-            style={{ fontSize: '13px' }}
-          >
-            Gate
-          </Link>
-          <Link
-            href={`/admin/events/${id}/edit`}
-            className="text-ash-gray hover:text-bone-white transition-colors font-light"
-            style={{ fontSize: '13px' }}
-          >
-            Edit
-          </Link>
-        </div>
+        <nav className="flex flex-wrap items-center gap-2" aria-label="Event">
+          <Link href={`/admin/events/${id}/reservations`} className="btn btn-primary btn-sm">Reservations</Link>
+          <Link href={`/admin/events/${id}/tiers`} className="btn btn-secondary btn-sm">Tiers</Link>
+          <Link href={`/gate/${id}`} className="btn btn-secondary btn-sm">Gate</Link>
+          <Link href={`/admin/events/${id}/edit`} className="btn btn-secondary btn-sm">Edit</Link>
+        </nav>
       </div>
 
-      <DoorCountCard eventId={id} initial={doorCount} loadedAt={new Date().toISOString()} />
+      <div className="grid gap-3 md:grid-cols-2 mb-3">
+        <DoorCountCard eventId={id} initial={doorCount} loadedAt={new Date().toISOString()} />
+
+        <section className="card p-6" aria-labelledby="capacity-h">
+          <div className="flex justify-between items-baseline mb-4">
+            <h2 id="capacity-h" className="label">Tickets sold</h2>
+            <span className="meta tabular-nums">{pct}%</span>
+          </div>
+          <p className="tabular-nums mb-4" style={{ fontSize: '34px', lineHeight: 1.1, fontWeight: 500, letterSpacing: '-0.02em' }}>
+            {totalSold.toLocaleString()}
+            <span className="text-muted" style={{ fontSize: '20px' }}> / {totalCapacity.toLocaleString()}</span>
+          </p>
+          <div className="meter" role="presentation">
+            <span data-tone={pct >= 90 ? 'warn' : undefined} style={{ transform: `scaleX(${pct / 100})` }} />
+          </div>
+          <p className="meta mt-3 tabular-nums">{totalRemaining.toLocaleString()} remaining</p>
+        </section>
+      </div>
+
       <OfflineScanIssues issues={offlineIssues} />
 
-      {/* Total capacity bar */}
-      <div className="p-6 border border-[#1a1a1a] mb-6" style={{ borderRadius: '16px' }}>
-        <div className="flex justify-between mb-4">
-          <span
-            className="text-ash-gray font-semibold uppercase"
-            style={{ fontSize: '11px', letterSpacing: '0.35px' }}
-          >
-            Total capacity
-          </span>
-          <span className="text-bone-white font-semibold" style={{ fontSize: '15px' }}>
-            {totalSold} / {totalCapacity} · {pct}%
-          </span>
-        </div>
-        <div className="w-full h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${pct >= 90 ? 'bg-saffron-spark' : 'bg-lime-spark'}`}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        <p className="text-ash-gray font-light mt-3" style={{ fontSize: '13px' }}>
-          {totalRemaining} remaining
-        </p>
-      </div>
-
-      {/* Per-tier breakdown */}
-      {stats.length === 0 ? (
-        <p className="text-ash-gray font-light" style={{ fontSize: '15px' }}>
-          No tiers yet.{' '}
-          <Link href={`/admin/events/${id}/tiers`} className="text-electric-iris hover:underline">
-            Add tiers →
-          </Link>
-        </p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {stats.map(tier => {
-            const tierPct = tier.capacity > 0 ? Math.round((tier.sold / tier.capacity) * 100) : 0
-            return (
-              <div
-                key={tier.id}
-                className="flex items-center justify-between p-5 border border-[#1a1a1a]"
-                style={{ borderRadius: '12px' }}
-              >
-                <div>
-                  <p className="text-bone-white font-normal" style={{ fontSize: '16px' }}>
-                    {tier.name}
-                  </p>
-                  <p className="text-saffron-spark font-semibold mt-0.5" style={{ fontSize: '13px' }}>
-                    LKR {tier.price.toLocaleString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p
-                    className="text-bone-white font-semibold tabular-nums"
-                    style={{ fontSize: '16px' }}
-                  >
-                    {tier.sold} / {tier.capacity}
-                  </p>
-                  <p className="text-ash-gray font-light mt-0.5" style={{ fontSize: '12px' }}>
-                    {tier.remaining} left · {tierPct}%
-                  </p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      <section className="mt-10" aria-labelledby="tiers-h">
+        <h2 id="tiers-h" className="h2 mb-4">Tiers</h2>
+        {stats.length === 0 ? (
+          <div className="card p-6">
+            <p className="meta">
+              No tiers yet.{' '}
+              <Link href={`/admin/events/${id}/tiers`} className="link">Add tiers</Link>
+            </p>
+          </div>
+        ) : (
+          <ul className="card divide-y divide-line">
+            {stats.map(tier => {
+              const tierPct = tier.capacity > 0 ? Math.round((tier.sold / tier.capacity) * 100) : 0
+              return (
+                <li key={tier.id} className="flex items-center justify-between gap-6 px-6 py-4">
+                  <div className="min-w-0">
+                    <p className="h3">{tier.name}</p>
+                    <p className="meta">LKR {tier.price.toLocaleString()}</p>
+                  </div>
+                  <div className="flex items-center gap-6 shrink-0">
+                    <div className="hidden sm:block w-32">
+                      <div className="meter">
+                        <span data-tone={tierPct >= 90 ? 'warn' : undefined} style={{ transform: `scaleX(${tierPct / 100})` }} />
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="tabular-nums font-medium">{tier.sold} / {tier.capacity}</p>
+                      <p className="meta tabular-nums">{tier.remaining} left</p>
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   )
 }

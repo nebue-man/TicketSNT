@@ -21,13 +21,23 @@ export function SearchInput({ defaultValue }: { defaultValue?: string }) {
   }, [value, pathname, router])
 
   return (
-    <input
-      type="search"
-      value={value}
-      onChange={e => setValue(e.target.value)}
-      placeholder="Search by name, NIC, or reservation ID…"
-      className="w-full bg-transparent border-b border-[#333] text-bone-white font-light pb-3 outline-none focus:border-electric-iris transition-colors placeholder:text-[#444]"
-      style={{ fontSize: '16px' }}
-    />
+    <div className="field">
+      <label htmlFor="reservation-search" className="label">Search reservations</label>
+      <div className="relative">
+        <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-muted pointer-events-none"
+          width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.75" stroke="currentColor" strokeWidth="1.5" />
+          <path d="m10.5 10.5 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+        <input
+          id="reservation-search"
+          type="search"
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          placeholder="Name, NIC or reservation ID"
+          className="input pl-11"
+        />
+      </div>
+    </div>
   )
 }

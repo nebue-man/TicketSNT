@@ -37,35 +37,33 @@ export function DoorCountCard({ eventId, initial, loadedAt }: {
 
   const pct = count && count.ticketsSold > 0 ? Math.min(100, Math.round((count.ticketsAdmitted / count.ticketsSold) * 100)) : 0
   const time = updatedAt?.toLocaleTimeString('en-LK', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Colombo' })
+  const toArrive = count ? Math.max(0, count.ticketsSold - count.ticketsAdmitted) : 0
 
   return (
-    <div className="p-6 border border-[#1a1a1a] mb-6" style={{ borderRadius: '16px' }}>
-      <div className="flex justify-between items-baseline mb-4">
-        <span className="text-ash-gray font-semibold uppercase" style={{ fontSize: '11px', letterSpacing: '0.35px' }}>
-          Door count
-        </span>
-        <span className="font-light" style={{ fontSize: '12px', color: stale ? '#ffb829' : '#555' }}>
-          {stale ? (time ? `Not updating — last ${time}` : 'Unavailable') : `Live · ${time}`}
+    <section className="card p-6" aria-labelledby="door-count-h">
+      <div className="flex justify-between items-baseline gap-4 mb-4">
+        <h2 id="door-count-h" className="label">Door count</h2>
+        <span className={`text-[13px] tabular-nums ${stale ? 'text-warn' : 'text-muted'}`}>
+          {stale ? (time ? `Not updating · last ${time}` : 'Unavailable') : `Live · ${time}`}
         </span>
       </div>
 
       {count ? (
         <>
-          <p className="text-bone-white font-normal tabular-nums mb-4" style={{ fontSize: '34px', lineHeight: 1.1, letterSpacing: '-0.02em' }}>
+          <p className="tabular-nums mb-4" style={{ fontSize: '34px', lineHeight: 1.1, fontWeight: 500, letterSpacing: '-0.02em' }}>
             {count.ticketsAdmitted.toLocaleString()}
-            <span className="text-ash-gray" style={{ fontSize: '20px' }}> / {count.ticketsSold.toLocaleString()} admitted</span>
+            <span className="text-muted" style={{ fontSize: '20px' }}> / {count.ticketsSold.toLocaleString()} admitted</span>
           </p>
-          <div className="w-full h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-            <div className="h-full rounded-full bg-lime-spark transition-all duration-500" style={{ width: `${pct}%` }} />
+          <div className="meter" role="presentation">
+            <span style={{ transform: `scaleX(${pct / 100})` }} />
           </div>
-          <p className="text-ash-gray font-light mt-3 tabular-nums" style={{ fontSize: '13px' }}>
-            {pct}% · Gate {count.ticketsAdmittedGate.toLocaleString()} · Box office {count.ticketsAdmittedBoxOffice.toLocaleString()}
-            {' · '}{(count.ticketsSold - count.ticketsAdmitted > 0 ? count.ticketsSold - count.ticketsAdmitted : 0).toLocaleString()} still to arrive
+          <p className="meta mt-3 tabular-nums">
+            Gate {count.ticketsAdmittedGate.toLocaleString()} · Box office {count.ticketsAdmittedBoxOffice.toLocaleString()} · {toArrive.toLocaleString()} still to arrive
           </p>
         </>
       ) : (
-        <p className="text-ash-gray font-light" style={{ fontSize: '14px' }}>Door count unavailable — retrying every 10 s.</p>
+        <p className="meta">Door count unavailable. Retrying every 10 s.</p>
       )}
-    </div>
+    </section>
   )
 }

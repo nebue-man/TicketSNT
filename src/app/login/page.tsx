@@ -51,99 +51,57 @@ function LoginForm() {
       router.push(destination)
       router.refresh()
     } catch {
-      setError('Network error — please try again.')
+      setError('Network error. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <main className="min-h-screen bg-void flex items-center justify-center px-6">
-      <div className="w-full max-w-[360px]">
-        <div className="mb-10">
-          <p
-            className="text-lime-spark font-semibold uppercase mb-4"
-            style={{ fontSize: '11px', letterSpacing: '0.35px' }}
-          >
-            SNT Entertainment
-          </p>
-          <h1
-            className="text-bone-white font-normal"
-            style={{ fontSize: '28px', lineHeight: 1.2, letterSpacing: '-0.02em' }}
-          >
-            Sign in
-          </h1>
+    <main className="min-h-screen bg-bg flex items-center justify-center px-6 py-12">
+      <div className="w-full max-w-[400px]">
+        <div className="flex items-center gap-3 mb-10">
+          <span className="mark" aria-hidden="true">S</span>
+          <span className="brand">SNT Entertainment</span>
+        </div>
+
+        <div className="card p-6 sm:p-8">
+          <h1 className="h1 mb-2">Sign in</h1>
+          <p className="meta mb-6">Choose your role, then enter its password.</p>
           {needsAdmin && (
-            <p className="text-saffron-spark font-light mt-3" style={{ fontSize: '13px' }}>
-              Admin access required. Please sign in as Admin.
-            </p>
+            <p className="notice mb-6">Admin access required. Sign in as Admin.</p>
           )}
-        </div>
 
-        {/* Role toggle */}
-        <div
-          className="flex mb-8 p-1 rounded-full"
-          style={{ backgroundColor: '#1a1a1a', border: '1px solid #2a2a2a' }}
-        >
-          {(['staff', 'admin', 'gate'] as const).map(r => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => switchRole(r)}
-              className="flex-1 font-semibold uppercase transition-all duration-200"
-              style={{
-                fontSize: '11px',
-                letterSpacing: '0.35px',
-                padding: '8px 0',
-                borderRadius: '20px',
-                backgroundColor: role === r ? '#7c3aed' : 'transparent',
-                color: role === r ? '#fff' : '#555',
-              }}
-            >
-              {ROLE_LABELS[r].pill}
+          <div className="seg mb-6" role="group" aria-label="Role">
+            {(['staff', 'admin', 'gate'] as const).map(r => (
+              <button key={r} type="button" aria-pressed={role === r} onClick={() => switchRole(r)}>
+                {ROLE_LABELS[r].pill}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            <div className="field">
+              <label htmlFor="password" className="label">{ROLE_LABELS[role].password}</label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                autoFocus
+                autoComplete="current-password"
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? 'password-error' : undefined}
+                className="input"
+              />
+              {error && <p id="password-error" className="field-error" role="alert">{error}</p>}
+            </div>
+
+            <button type="submit" disabled={loading || !password} className="btn btn-primary btn-block btn-lg">
+              {loading ? 'Signing in…' : ROLE_LABELS[role].submit}
             </button>
-          ))}
+          </form>
         </div>
-
-        <form onSubmit={handleSubmit}>
-          <label
-            htmlFor="password"
-            className="block text-ash-gray font-semibold uppercase mb-3"
-            style={{ fontSize: '11px', letterSpacing: '0.35px' }}
-          >
-            {ROLE_LABELS[role].password}
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            autoFocus
-            autoComplete="current-password"
-            className="w-full bg-transparent border-b border-[#333] text-bone-white font-light pb-3 mb-8 outline-none focus:border-electric-iris transition-colors"
-            style={{ fontSize: '18px' }}
-          />
-
-          {error && (
-            <p className="text-saffron-spark mb-6" style={{ fontSize: '14px' }}>
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading || !password}
-            className="w-full flex items-center justify-center bg-electric-iris text-bone-white font-semibold uppercase disabled:opacity-40 active:scale-[0.97] transition-[transform,opacity] duration-100 ease-out"
-            style={{
-              fontSize: '14px',
-              letterSpacing: '0.025em',
-              borderRadius: '24px',
-              padding: '14px 32px',
-            }}
-          >
-            {loading ? 'Signing in…' : ROLE_LABELS[role].submit}
-          </button>
-        </form>
       </div>
     </main>
   )

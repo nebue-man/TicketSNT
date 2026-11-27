@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getEventWithTicketTypes } from '@/lib/data/events'
 import { ReservationForm } from '@/components/reservation/ReservationForm'
@@ -31,89 +32,42 @@ export default async function ReservePage({ params }: Props) {
   })
 
   return (
-    <main className="min-h-screen bg-void px-6 py-16">
-      <div className="max-w-[640px] mx-auto">
-
-        {/* SNT wordmark */}
-        <div className="mb-10">
-          <span className="text-[14px] font-semibold uppercase tracking-[0.35px] text-ash-gray">
-            SNT Entertainment
-          </span>
+    <div className="min-h-screen bg-bg">
+      <header className="topbar px-6">
+        <div className="max-w-[1024px] h-full mx-auto flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-3">
+            <span className="mark" aria-hidden="true">S</span>
+            <span className="brand">SNT Counter</span>
+          </Link>
+          <Link href="/" className="navlink">All events</Link>
         </div>
+      </header>
 
-        {/* Event flyer — contained card, poster ratio */}
-        <div
-          className="w-full mb-12 overflow-hidden animate-fade-in"
-          style={{ borderRadius: '16px', aspectRatio: '3/4', maxHeight: '480px' }}
-        >
-          {event.cover_image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={event.cover_image_url}
-              alt={`${event.name} flyer`}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            /* Placeholder when no flyer is uploaded */
-            <div
-              className="relative w-full h-full flex flex-col justify-end p-8"
-              style={{
-                background: 'linear-gradient(160deg, #0d0d1f 0%, #0a0a0a 55%, #111118 100%)',
-                borderRadius: '16px',
-              }}
-            >
-              {/* Decorative top-right accent */}
-              <div
-                className="absolute top-0 right-0 w-48 h-48 pointer-events-none"
-                style={{
-                  background: 'radial-gradient(circle at top right, rgba(128,82,255,0.15) 0%, transparent 70%)',
-                  borderRadius: '0 16px 0 0',
-                }}
-              />
-              <p
-                className="text-lime-spark font-semibold uppercase mb-3"
-                style={{ fontSize: '11px', letterSpacing: '0.35px' }}
-              >
-                Live Event
-              </p>
-              <p
-                className="text-bone-white font-normal mb-2"
-                style={{ fontSize: '28px', lineHeight: 1.2, letterSpacing: '-0.02em' }}
-              >
-                {event.name}
-              </p>
-              <p
-                className="text-ash-gray font-light"
-                style={{ fontSize: '14px' }}
-              >
-                {event.venue}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Event header */}
-        <header className="mb-14">
-          <p className="text-[14px] font-semibold uppercase tracking-[0.35px] text-lime-spark mb-4">
-            Live Event
-          </p>
-          <h1
-            className="text-bone-white font-normal mb-4"
-            style={{ fontSize: '42px', lineHeight: 1.2, letterSpacing: '-1.68px' }}
-          >
-            {event.name}
-          </h1>
-          <p className="text-ash-gray font-light" style={{ fontSize: '18px' }}>
-            {dateStr} · {timeStr} (Sri Lanka time)
-          </p>
-          <p className="text-ash-gray font-light" style={{ fontSize: '18px' }}>
-            {event.venue}
-          </p>
-        </header>
+      <main className="max-w-[1024px] mx-auto px-6 pt-10 pb-24 grid gap-10 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:gap-16">
+        {/* Event: flyer and details; sticks beside the form on wide screens */}
+        <aside className="lg:sticky lg:top-[104px] self-start">
+          <div className="card overflow-hidden mb-6 aspect-[4/5] max-h-[320px] lg:max-h-none w-full">
+            {event.cover_image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={event.cover_image_url} alt={`${event.name} flyer`} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex flex-col justify-end p-6 bg-surface">
+                <span className="mark mb-4" aria-hidden="true">S</span>
+                <p className="h2">{event.name}</p>
+                <p className="meta">{event.venue}</p>
+              </div>
+            )}
+          </div>
+          <h1 className="h1 mb-3">{event.name}</h1>
+          <dl className="flex flex-col gap-1 meta">
+            <div><dt className="sr-only">Date</dt><dd className="text-ink">{dateStr}</dd></div>
+            <div><dt className="sr-only">Time</dt><dd className="tabular-nums">{timeStr} Sri Lanka time</dd></div>
+            <div><dt className="sr-only">Venue</dt><dd>{event.venue}</dd></div>
+          </dl>
+        </aside>
 
         <ReservationForm event={event} ticketTypes={ticketTypes} />
-
-      </div>
-    </main>
+      </main>
+    </div>
   )
 }

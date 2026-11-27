@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { generatePin } from '@/lib/utils/generate-pin'
-import { NumberInput } from '@/components/NumberInput'
+import { EventFields, PublishSwitch, type EventFieldValues } from '@/components/admin/EventFields'
 import type { Event } from '@/types/database'
 
 // datetime-local inputs expect 'YYYY-MM-DDTHH:MM' (no seconds/tz)
@@ -26,13 +25,15 @@ const CONFIRM: Record<Action, string> = {
 
 export default function EditEventForm({ event }: { event: Event }) {
   const router = useRouter()
-  const [name, setName] = useState(event.name)
-  const [dateTime, setDateTime] = useState(toDateTimeLocal(event.date_time))
-  const [venue, setVenue] = useState(event.venue)
-  const [description, setDescription] = useState(event.description)
-  const [coverUrl, setCoverUrl] = useState(event.cover_image_url ?? '')
-  const [maxPer, setMaxPer] = useState(event.max_per_reservation)
-  const [pin, setPin] = useState(event.gate_pin)
+  const [values, setValues] = useState<EventFieldValues>({
+    name: event.name,
+    dateTime: toDateTimeLocal(event.date_time),
+    venue: event.venue,
+    description: event.description,
+    coverUrl: event.cover_image_url ?? '',
+    maxPer: event.max_per_reservation,
+    pin: event.gate_pin,
+  })
   const [publish, setPublish] = useState(event.status === 'published')
   const [submitting, setSubmitting] = useState(false)
   const [busy, setBusy] = useState<Action | null>(null)
@@ -49,13 +50,13 @@ export default function EditEventForm({ event }: { event: Event }) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
-          date_time: dateTime,
-          venue,
-          description,
-          cover_image_url: coverUrl || null,
-          max_per_reservation: maxPer,
-          gate_pin: pin,
+          name: values.name,
+          date_time: values.dateTime,
+          venue: values.venue,
+          description: values.description,
+          cover_image_url: values.coverUrl || null,
+          max_per_reservation: values.maxPer,
+          gate_pin: values.pin,
           // Closed and archived events keep their status; sending the toggle would reset them to draft.
           ...(isClosed ? {} : { status: publish ? 'published' : 'draft' }),
         }),
@@ -95,218 +96,88 @@ export default function EditEventForm({ event }: { event: Event }) {
     }
   }
 
-  const inputClass = 'w-full bg-transparent border-b border-[#333] text-bone-white font-light pb-3 outline-none focus:border-electric-iris transition-colors placeholder:text-[#444]'
-  const labelClass = 'block text-ash-gray font-semibold uppercase mb-3'
-  const linkButton = 'hover:opacity-80 transition-opacity font-light disabled:opacity-50'
-
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-10 max-w-[600px]">
-      {/* Name */}
-      <div>
-        <label className={labelClass} style={{ fontSize: '12px', letterSpacing: '0.35px' }}>
-          Event name
-        </label>
-        <input
-          required
-          type="text"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          className={inputClass}
-          style={{ fontSize: '18px' }}
-        />
-      </div>
+    <div className="flex flex-col gap-6">
+      <form onSubmit={handleSubmit} className="card p-6 sm:p-8 flex flex-col gap-6">
+        <EventFields values={values} onChange={patch => setValues(v => ({ ...v, ...patch }))} />
 
-      {/* Date / time */}
-      <div>
-        <label className={labelClass} style={{ fontSize: '12px', letterSpacing: '0.35px' }}>
-          Date &amp; time
-        </label>
-        <input
-          required
-          type="datetime-local"
-          value={dateTime}
-          onChange={e => setDateTime(e.target.value)}
-          className={inputClass}
-          style={{ fontSize: '18px', colorScheme: 'dark' }}
-        />
-      </div>
+        {/* Closed and archived events keep their status */}
+        {!isClosed && <PublishSwitch checked={publish} onChange={setPublish} label="Published" />}
 
-      {/* Venue */}
-      <div>
-        <label className={labelClass} style={{ fontSize: '12px', letterSpacing: '0.35px' }}>
-          Venue
-        </label>
-        <input
-          required
-          type="text"
-          value={venue}
-          onChange={e => setVenue(e.target.value)}
-          className={inputClass}
-          style={{ fontSize: '18px' }}
-        />
-      </div>
+        {error && <p className="field-error mt-0" role="alert">{error}</p>}
 
-      {/* Description */}
-      <div>
-        <label className={labelClass} style={{ fontSize: '12px', letterSpacing: '0.35px' }}>
-          Description <span className="normal-case font-light text-[#555]">(optional)</span>
-        </label>
-        <textarea
-          rows={4}
-          value={description}
-          onChange={e => setDescription(e.target.value)}
-          className={`${inputClass} resize-none`}
-          style={{ fontSize: '16px' }}
-        />
-      </div>
-
-      {/* Cover image URL */}
-      <div>
-        <label className={labelClass} style={{ fontSize: '12px', letterSpacing: '0.35px' }}>
-          Cover image URL <span className="normal-case font-light text-[#555]">(optional)</span>
-        </label>
-        <input
-          type="url"
-          value={coverUrl}
-          onChange={e => setCoverUrl(e.target.value)}
-          placeholder="https://…"
-          className={inputClass}
-          style={{ fontSize: '18px' }}
-        />
-      </div>
-
-      {/* Max per reservation */}
-      <div>
-        <label className={labelClass} style={{ fontSize: '12px', letterSpacing: '0.35px' }}>
-          Max tickets per reservation
-        </label>
-        <NumberInput
-          min={1}
-          max={20}
-          value={maxPer}
-          onChange={setMaxPer}
-          className={inputClass}
-          style={{ fontSize: '18px' }}
-        />
-      </div>
-
-      {/* Gate PIN */}
-      <div>
-        <label className={labelClass} style={{ fontSize: '12px', letterSpacing: '0.35px' }}>
-          Gate PIN
-        </label>
-        <div className="flex items-end gap-4">
-          <input
-            required
-            type="text"
-            value={pin}
-            onChange={e => setPin(e.target.value.toUpperCase())}
-            className={`flex-1 ${inputClass}`}
-            style={{ fontSize: '22px', fontFamily: 'monospace', letterSpacing: '0.15em' }}
-          />
-          <button
-            type="button"
-            onClick={() => setPin(generatePin())}
-            className="text-ash-gray hover:text-bone-white transition-colors font-light shrink-0 pb-3"
-            style={{ fontSize: '13px' }}>
-            Regenerate
+        <div className="flex flex-wrap gap-3 pt-6 border-t border-line">
+          <button type="submit" disabled={submitting} className="btn btn-primary">
+            {submitting ? 'Saving…' : 'Save changes'}
+          </button>
+          <button type="button" onClick={() => router.push('/admin/events')} className="btn btn-secondary">
+            Cancel
           </button>
         </div>
-      </div>
+      </form>
 
-      {/* Publish toggle (closed and archived events keep their status) */}
-      {!isClosed && <div>
-        <label className="flex items-center gap-3 cursor-pointer">
-          <div className="relative">
-            <input
-              type="checkbox"
-              checked={publish}
-              onChange={e => setPublish(e.target.checked)}
-              className="sr-only"
+      <section className="card p-6 sm:p-8" aria-labelledby="event-actions-h">
+        <h2 id="event-actions-h" className="h2 mb-2">Close, archive or delete</h2>
+        <ul className="divide-y divide-line">
+          {!isClosed && (
+            <ActionRow
+              title="Close event"
+              text="Stops ticket sales now. This cannot be undone."
+              button={busy === 'close' ? 'Closing…' : 'Close event'}
+              disabled={busy !== null}
+              onClick={() => runAction('close')}
+              danger
             />
-            <div
-              className="w-10 h-6 rounded-full transition-colors duration-200"
-              style={{ backgroundColor: publish ? '#7c3aed' : '#333' }}>
-            </div>
-            <div
-              className="absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
-              style={{ left: publish ? '22px' : '4px' }}>
-            </div>
-          </div>
-          <span className={labelClass} style={{ fontSize: '12px', letterSpacing: '0.35px', marginBottom: 0 }}>
-            Published
-          </span>
-        </label>
-      </div>}
-
-      {error && (
-        <p className="text-saffron-spark font-light" style={{ fontSize: '14px' }}>
-          {error}
-        </p>
-      )}
-
-      <div className="flex items-center gap-4 pt-2 flex-wrap">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="bg-electric-iris text-bone-white font-semibold uppercase active:scale-[0.97] transition-[transform,opacity] duration-100 ease-out disabled:opacity-50"
-          style={{ fontSize: '13px', letterSpacing: '0.025em', borderRadius: '24px', padding: '12px 28px' }}>
-          {submitting ? 'Saving…' : 'Save changes'}
-        </button>
-
-        {!isClosed && (
-          <button
-            type="button"
+          )}
+          {isArchived ? (
+            <ActionRow
+              title="Restore event"
+              text="Puts it back in your events list as closed."
+              button={busy === 'restore' ? 'Restoring…' : 'Restore event'}
+              disabled={busy !== null}
+              onClick={() => runAction('restore')}
+            />
+          ) : (
+            <ActionRow
+              title="Archive event"
+              text="For an event that has ended. Hides it from your events list and keeps all its records."
+              button={busy === 'archive' ? 'Archiving…' : 'Archive event'}
+              disabled={busy !== null}
+              onClick={() => runAction('archive')}
+            />
+          )}
+          <ActionRow
+            title="Delete event"
+            text="For an event made by mistake. Only works while it has no reservations."
+            button={busy === 'delete' ? 'Deleting…' : 'Delete event'}
             disabled={busy !== null}
-            onClick={() => runAction('close')}
-            className={`text-saffron-spark ${linkButton}`}
-            style={{ fontSize: '13px' }}>
-            {busy === 'close' ? 'Closing…' : 'Close event'}
-          </button>
-        )}
+            onClick={() => runAction('delete')}
+            danger
+          />
+        </ul>
+      </section>
+    </div>
+  )
+}
 
-        <button
-          type="button"
-          onClick={() => router.push('/admin/events')}
-          className="text-ash-gray hover:text-bone-white transition-colors font-light"
-          style={{ fontSize: '13px' }}>
-          Cancel
-        </button>
+function ActionRow({ title, text, button, disabled, onClick, danger }: {
+  title: string
+  text: string
+  button: string
+  disabled: boolean
+  onClick: () => void
+  danger?: boolean
+}) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-4 py-4">
+      <div className="min-w-0 flex-1 basis-64">
+        <p className="font-medium">{title}</p>
+        <p className="meta">{text}</p>
       </div>
-
-      {/* Archive / restore / delete */}
-      <div className="flex flex-col gap-5 pt-8 border-t border-[#1a1a1a]">
-        {isArchived ? (
-          <div>
-            <button type="button" disabled={busy !== null} onClick={() => runAction('restore')}
-              className={`text-bone-white ${linkButton}`} style={{ fontSize: '13px' }}>
-              {busy === 'restore' ? 'Restoring…' : 'Restore event'}
-            </button>
-            <p className="text-ash-gray font-light mt-1" style={{ fontSize: '12px' }}>
-              This event is archived. Restoring puts it back in your events list as closed.
-            </p>
-          </div>
-        ) : (
-          <div>
-            <button type="button" disabled={busy !== null} onClick={() => runAction('archive')}
-              className={`text-bone-white ${linkButton}`} style={{ fontSize: '13px' }}>
-              {busy === 'archive' ? 'Archiving…' : 'Archive event'}
-            </button>
-            <p className="text-ash-gray font-light mt-1" style={{ fontSize: '12px' }}>
-              For an event that has ended. Hides it from your events list and keeps all its records.
-            </p>
-          </div>
-        )}
-        <div>
-          <button type="button" disabled={busy !== null} onClick={() => runAction('delete')}
-            className={`text-saffron-spark ${linkButton}`} style={{ fontSize: '13px' }}>
-            {busy === 'delete' ? 'Deleting…' : 'Delete event'}
-          </button>
-          <p className="text-ash-gray font-light mt-1" style={{ fontSize: '12px' }}>
-            For an event made by mistake. Only works while it has no reservations.
-          </p>
-        </div>
-      </div>
-    </form>
+      <button type="button" disabled={disabled} onClick={onClick}
+        className={`btn btn-secondary btn-sm shrink-0 ${danger ? 'text-danger-text' : ''}`}>
+        {button}
+      </button>
+    </li>
   )
 }

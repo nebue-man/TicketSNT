@@ -1,56 +1,55 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600;700&display=swap');
 @import "tailwindcss";
 
+/*
+  SNT design system (tasteskill 2.5 deal, 2026-11-27)
+  palette soot-pale-lime, accent kept at SNT's own lime #b9ff4b
+  type instrument: Instrument Sans + DM Mono (loaded with next/font in app/layout.tsx)
+  radius soft, buttons pill (filled primary, tonal secondary)
+  One button pair, one card, one field, one link look for every screen.
+*/
+
 @theme {
-  /* Colors */
-  --color-void: #000000;
-  --color-bone-white: #ffffff;
-  --color-ash-gray: #9a9a9a;
-  --color-silver-mist: #bdbdbd;
-  --color-electric-iris: #8052ff;
-  --color-saffron-spark: #ffb829;
-  --color-lime-spark: #b9ff4b;
-  --color-deep-verdant: #15846e;
+  --color-bg: #0f0f0f;
+  --color-surface: #1a1a1a;
+  --color-surface-2: #242424;
+  --color-ink: #ffffff;
+  --color-muted: #8f8f8f;
+  --color-faint: #5f5f5f;
+  --color-line: rgb(255 255 255 / 0.12);
+  --color-line-strong: rgb(255 255 255 / 0.24);
+  --color-accent: #b9ff4b;
+  --color-accent-ink: #0f0f0f;
 
-  /* Typography */
-  --font-ppneuemontreal: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* State colours: the gate's outcome screens and warnings */
+  --color-ok: #b9ff4b;
+  --color-warn: #ffb829;
+  --color-danger: #e5383b;
+  --color-danger-text: #ff7a7c;
 
-  /* Border Radius */
-  --radius-3xl: 24px;
-  --radius-full: 9999px;
-  --radius-nav: 24px;
-  --radius-tags: 9999px;
-  --radius-cards: 24px;
-  --radius-buttons: 24px;
+  --font-sans: var(--font-instrument), system-ui, sans-serif;
+  --font-mono: var(--font-dm-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
-  /* Spacing */
-  --spacing-6: 6px;
-  --spacing-12: 12px;
-  --spacing-18: 18px;
-  --spacing-24: 24px;
-  --spacing-30: 30px;
-  --spacing-36: 36px;
-  --spacing-60: 60px;
-  --spacing-96: 96px;
-  --spacing-120: 120px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-btn: 999px;
 
-  /* Animations — spring curve for screen entrances, ease-out for quick feedback */
-  --animate-fade-in-up: fade-in-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-  --animate-scale-in:   scale-in   0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  --animate-fade-in:    fade-in    0.25s ease-out both;
+  --ease-ui: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-fade-in-up: fade-in-up 0.52s var(--ease-enter) both;
+  --animate-scale-in: scale-in 0.35s var(--ease-enter) both;
+  --animate-fade-in: fade-in 0.25s ease-out both;
 }
 
-/* Keyframes */
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes scale-in {
-  from { opacity: 0; transform: scale(0.93); }
+  from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
 }
-
 @keyframes fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -58,40 +57,219 @@
 
 @layer base {
   html {
-    background-color: #000000;
-    color: #ffffff;
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    color-scheme: dark;
   }
-
   body {
-    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-weight: 200;
-    font-size: 18px;
+    font-family: var(--font-sans);
+    font-size: 16px;
+    font-weight: 400;
     line-height: 1.5;
-    background-color: #000000;
-    color: #ffffff;
+    background-color: var(--color-bg);
+    color: var(--color-ink);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-
-  ::selection {
-    background-color: #8052ff;
-    color: #ffffff;
-  }
-
-  input, textarea, select {
-    font-family: inherit;
-  }
-
-  /* §1 — feedback on pointer-down, not release */
+  ::selection { background-color: var(--color-accent); color: var(--color-accent-ink); }
+  input, textarea, select, button { font: inherit; }
   button { cursor: pointer; }
   button:disabled { cursor: default; }
+  :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
-  /* §14 — reduced motion: replace spring/slide with simple opacity fade */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+@layer components {
+  /* ── Type ─────────────────────────────────────────────────────────── */
+  .h1 {
+    font-size: clamp(28px, 2.2vw + 18px, 36px);
+    line-height: 1.12;
+    font-weight: 500;
+    letter-spacing: -0.028em;
+    font-stretch: 96%;
+    text-wrap: balance;
+  }
+  .h2 { font-size: 22px; line-height: 1.25; font-weight: 500; letter-spacing: -0.02em; }
+  .h3 { font-size: 17px; line-height: 1.35; font-weight: 500; letter-spacing: -0.01em; }
+  .label { display: block; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--color-muted); }
+  .meta { font-size: 14px; line-height: 1.5; color: var(--color-muted); }
+  .mono { font-family: var(--font-mono); letter-spacing: 0.02em; }
+  .brand { font-size: 15px; font-weight: 500; letter-spacing: -0.01em; }
+
+  /* ── Buttons: one pair ────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 44px; padding: 0 24px;
+    border-radius: var(--radius-btn); border: 1px solid transparent;
+    font-size: 16px; font-weight: 500; line-height: 1; white-space: nowrap;
+    transition: background-color 150ms var(--ease-ui), border-color 150ms var(--ease-ui),
+      color 150ms var(--ease-ui), transform 150ms var(--ease-ui), opacity 150ms var(--ease-ui);
+  }
+  .btn:active:not(:disabled) { transform: translateY(1px) scale(0.985); transition-duration: 90ms; }
+  .btn:disabled { opacity: 0.4; }
+  .btn-primary { background: var(--color-accent); color: var(--color-accent-ink); }
+  .btn-secondary { background: color-mix(in oklab, var(--color-ink) 8%, var(--color-bg)); color: var(--color-ink); }
+  .btn-sm { height: 36px; padding: 0 16px; font-size: 14px; }
+  .btn-lg { height: 56px; padding: 0 28px; font-size: 18px; }
+  .btn-block { width: 100%; }
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled) { transform: translateY(-1px); }
+    .btn-primary:hover:not(:disabled) { background: color-mix(in oklab, var(--color-accent) 86%, var(--color-ink)); }
+    .btn-secondary:hover:not(:disabled) { background: color-mix(in oklab, var(--color-ink) 14%, var(--color-bg)); }
+  }
+
+  /* ── Links: one look ──────────────────────────────────────────────── */
+  /* Nav and action words: rest bare, brighten, draw a 1px line under */
+  .navlink {
+    position: relative; display: inline-flex; align-items: center; min-height: 44px;
+    font-size: 15px; font-weight: 500; color: var(--color-muted);
+    transition: color 150ms var(--ease-ui);
+  }
+  .navlink::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 8px; height: 1px;
+    background: currentColor; transform: scaleX(0); transform-origin: right;
+    transition: transform 120ms var(--ease-ui);
+  }
+  .navlink:disabled { opacity: 0.4; }
+  .navlink[aria-current="page"] { color: var(--color-ink); }
+  .navlink[aria-current="page"]::after { height: 2px; transform: scaleX(1); }
+  @media (hover: hover) and (pointer: fine) {
+    .navlink:hover:not(:disabled) { color: var(--color-ink); }
+    .navlink:hover:not(:disabled)::after { transform: scaleX(1); transform-origin: left; transition-duration: 150ms; }
+  }
+  .navlink:focus-visible { color: var(--color-ink); }
+  .navlink-danger { color: var(--color-danger-text); }
+  @media (hover: hover) and (pointer: fine) {
+    .navlink-danger:hover:not(:disabled) { color: var(--color-danger-text); }
+  }
+  /* Running text: a faint hairline, an ink line draws over it */
+  .link {
+    color: var(--color-ink);
+    text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px;
+    text-decoration-color: var(--color-line-strong);
+    transition: text-decoration-color 150ms var(--ease-ui);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .link:hover { text-decoration-color: currentColor; }
+  }
+
+  /* ── Cards ────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--color-surface); border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+  }
+  .card-link {
+    display: block;
+    transition: transform 180ms var(--ease-ui), border-color 180ms var(--ease-ui), box-shadow 180ms var(--ease-ui);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .card-link:hover { transform: translateY(-2px); border-color: var(--color-line-strong); }
+  }
+  .card-link:active { transform: translateY(0) scale(0.995); }
+
+  /* ── Fields ───────────────────────────────────────────────────────── */
+  .input {
+    display: block; width: 100%; height: 48px; padding: 0 16px;
+    background: var(--color-bg); color: var(--color-ink);
+    border: 1px solid var(--color-line-strong); border-radius: var(--radius-sm);
+    font-size: 16px; line-height: 1.4;
+    transition: border-color 140ms var(--ease-ui), box-shadow 140ms var(--ease-ui);
+  }
+  .input::placeholder { color: var(--color-faint); }
+  .input:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px rgb(185 255 75 / 0.22); }
+  .input[aria-invalid="true"] { border-color: var(--color-danger-text); }
+  textarea.input { height: auto; padding: 12px 16px; resize: vertical; }
+  .field > .label { margin-bottom: 8px; }
+  .field-error { margin-top: 8px; font-size: 14px; color: var(--color-danger-text); }
+  .hint { margin-top: 8px; font-size: 14px; line-height: 1.5; color: var(--color-muted); }
+
+  /* Checkbox */
+  .check {
+    appearance: none; flex-shrink: 0; width: 20px; height: 20px; margin: 2px 0 0;
+    border: 1px solid var(--color-line-strong); border-radius: 6px; background: var(--color-bg);
+    display: grid; place-content: center;
+    transition: background-color 140ms var(--ease-ui), border-color 140ms var(--ease-ui);
+  }
+  .check::after {
+    content: ""; width: 12px; height: 12px; background: var(--color-accent-ink);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.2 4.8 9 10 3' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.2 4.8 9 10 3' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    transform: scale(0.7); opacity: 0; transition: transform 160ms var(--ease-ui), opacity 160ms var(--ease-ui);
+  }
+  .check:checked { background: var(--color-accent); border-color: var(--color-accent); }
+  .check:checked::after { transform: scale(1); opacity: 1; }
+
+  /* Switch: <input type="checkbox" role="switch" class="switch"> */
+  .switch {
+    appearance: none; flex-shrink: 0; position: relative; width: 40px; height: 24px; margin: 0;
+    border-radius: 999px; background: var(--color-surface-2); border: 1px solid var(--color-line-strong);
+    transition: background-color 180ms var(--ease-ui), border-color 180ms var(--ease-ui);
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+    border-radius: 999px; background: var(--color-ink);
+    transition: transform 180ms var(--ease-ui), background-color 180ms var(--ease-ui);
+  }
+  .switch:checked { background: var(--color-accent); border-color: var(--color-accent); }
+  .switch:checked::after { transform: translateX(16px); background: var(--color-accent-ink); }
+
+  /* Segmented control: buttons with aria-pressed */
+  .seg {
+    display: flex; gap: 4px; padding: 4px;
+    background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-btn);
+  }
+  .seg > button {
+    flex: 1; min-height: 40px; padding: 0 12px; border-radius: var(--radius-btn);
+    font-size: 14px; font-weight: 500; color: var(--color-muted);
+    transition: background-color 150ms var(--ease-ui), color 150ms var(--ease-ui);
+  }
+  .seg > button[aria-pressed="true"] { background: var(--color-ink); color: var(--color-bg); }
+  .seg > button[aria-pressed="true"][data-tone="warn"] { background: var(--color-warn); color: #0f0f0f; }
+  @media (hover: hover) and (pointer: fine) {
+    .seg > button:not([aria-pressed="true"]):hover { color: var(--color-ink); }
+  }
+
+  /* ── Status and progress ──────────────────────────────────────────── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--color-muted);
+  }
+  .badge::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+  .badge[data-status="published"] { color: var(--color-accent); }
+  .badge[data-status="closed"] { color: var(--color-warn); }
+  .badge[data-status="archived"] { color: var(--color-faint); }
+  .badge[data-status="void"] { color: var(--color-danger-text); }
+
+  .meter { width: 100%; height: 6px; border-radius: 999px; background: var(--color-surface-2); overflow: hidden; }
+  .meter > span {
+    /* fill with style={{ transform: `scaleX(${pct / 100})` }} */
+    display: block; width: 100%; height: 100%; background: var(--color-accent);
+    transform-origin: left; transition: transform 500ms var(--ease-ui);
+  }
+  .meter > span[data-tone="warn"] { background: var(--color-warn); }
+
+  .notice {
+    padding: 16px; border-radius: var(--radius-md); font-size: 14px; line-height: 1.5;
+    border: 1px solid color-mix(in oklab, var(--color-warn) 40%, transparent);
+    background: color-mix(in oklab, var(--color-warn) 8%, var(--color-bg));
+    color: var(--color-ink);
+  }
+
+  /* ── Shell ────────────────────────────────────────────────────────── */
+  .topbar {
+    position: sticky; top: 0; z-index: 10; height: 64px;
+    background: var(--color-bg); border-bottom: 1px solid var(--color-line);
+  }
+  .mark {
+    display: inline-grid; place-content: center; width: 28px; height: 28px; border-radius: 8px;
+    background: var(--color-accent); color: var(--color-accent-ink);
+    font-size: 13px; font-weight: 600; letter-spacing: -0.02em;
   }
 }
