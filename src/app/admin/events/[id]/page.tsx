@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getAdminEvent } from '@/lib/data/admin/events'
 import { getEventStats } from '@/lib/data/admin/reservations'
+import { getDoorCount } from '@/lib/data/admin/door-count'
+import { DoorCountCard } from '@/components/admin/DoorCountCard'
 import type { EventStatus } from '@/types/database'
 
 function statusColor(status: EventStatus): string {
@@ -16,7 +18,7 @@ function statusColor(status: EventStatus): string {
 
 export default async function EventDashboardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [event, stats] = await Promise.all([getAdminEvent(id), getEventStats(id)])
+  const [event, stats, doorCount] = await Promise.all([getAdminEvent(id), getEventStats(id), getDoorCount(id)])
   if (!event) notFound()
 
   const totalCapacity = stats.reduce((s, t) => s + t.capacity, 0)
@@ -83,6 +85,8 @@ export default async function EventDashboardPage({ params }: { params: Promise<{
           </Link>
         </div>
       </div>
+
+      <DoorCountCard eventId={id} initial={doorCount} loadedAt={new Date().toISOString()} />
 
       {/* Total capacity bar */}
       <div className="p-6 border border-[#1a1a1a] mb-6" style={{ borderRadius: '16px' }}>

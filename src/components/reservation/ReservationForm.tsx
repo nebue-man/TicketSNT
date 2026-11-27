@@ -12,7 +12,24 @@ interface Props {
 
 type FormStatus = 'idle' | 'submitting' | 'success' | 'error'
 
+/** Ordinary Reservation, or a Door sale (admitted now, or entered from paper). */
+type SaleType = 'reservation' | 'door_now' | 'door_paper'
+
+const SALE_TYPES: { value: SaleType; label: string; hint: string }[] = [
+  { value: 'reservation', label: 'Reservation', hint: 'Buyer is scanned in at the gate.' },
+  { value: 'door_now', label: 'Door sale', hint: 'Sold at the box office now — buyer is admitted immediately, no gate scan needed.' },
+  { value: 'door_paper', label: 'From paper', hint: 'Door sale written on paper during an outage — buyer is already inside. Enter the time on the paper.' },
+]
+
+/** Current local time as a datetime-local input value (YYYY-MM-DDTHH:MM). */
+function nowForInput(): string {
+  const d = new Date()
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 16)
+}
+
 interface FieldErrors {
+  paper_time?: string
   buyer_name?: string
   buyer_email?: string
   buyer_phone?: string
@@ -189,8 +206,18 @@ export function ReservationForm({ event, ticketTypes }: Props) {
   const [reservationId, setReservationId] = useState('')
   const [submittedItems, setSubmittedItems] = useState<SubmittedItem[]>([])
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [saleType, setSaleType] = useState<SaleType>('reservation')
+  const [paperTime, setPaperTime] = useState('')
+  const [submittedSaleType, setSubmittedSaleType] = useState<SaleType>('reservation')
 
   const totalTickets = Object.values(quantities).reduce((sum, q) => sum + q, 0)
+  const isDoorSale = saleType !== 'reservation'
+
+  function chooseSaleType(next: SaleType) {
+    setSaleType(next)
+    if (next === 'door_paper' && !paperTime) setPaperTime(nowForInput())
+    setFieldErrors(p => ({ ...p, paper_time: undefined }))
+  }
 
   function handleQuantityChange(typeId: string, qty: number) {
     setQuantities(prev => ({ ...prev, [typeId]: qty }))
@@ -205,6 +232,9 @@ export function ReservationForm({ event, ticketTypes }: Props) {
     if (!buyerNic.trim()) errors.buyer_nic = 'NIC / Passport No. is required'
     if (totalTickets === 0) errors.items = 'Select at least one ticket'
     if (!consent) errors.consent = 'You must accept to continue'
+    if (saleType === 'door_paper' && (!paperTime || Number.isNaN(new Date(paperTime).getTime()))) {
+      errors.paper_time = 'Enter the time written on the paper'
+    }
     setFieldErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -227,6 +257,9 @@ export function ReservationForm({ event, ticketTypes }: Props) {
           buyer_name: buyerName, buyer_email: buyerEmail,
           buyer_phone: buyerPhone, buyer_nic: buyerNic,
           items, consent,
+          door_sale: saleType === 'door_now' ? { mode: 'now' }
+            : saleType === 'door_paper' ? { mode: 'paper', admitted_at: new Date(paperTime).toISOString() }
+            : undefined,
         }),
       })
       const json = await res.json()
@@ -248,6 +281,7 @@ export function ReservationForm({ event, ticketTypes }: Props) {
 
       setReservationId(json.reservationId)
       setSubmittedItems(submitted)
+      setSubmittedSaleType(saleType)
       setStatus('success')
     } catch {
       setStatus('error')
@@ -267,6 +301,8 @@ export function ReservationForm({ event, ticketTypes }: Props) {
     setReservationId('')
     setSubmittedItems([])
     setFieldErrors({})
+    // saleType and the last paper time are kept: the box office usually enters
+    // several Door sales in a row, and paper slips come in time order.
   }
 
   if (status === 'success') {
@@ -280,14 +316,18 @@ export function ReservationForm({ event, ticketTypes }: Props) {
       <div className="py-10 animate-fade-in-up">
         <p className="text-lime-spark font-semibold uppercase mb-6"
           style={{ fontSize: '14px', letterSpacing: '0.35px' }}>
-          Confirmed
+          {submittedSaleType === 'reservation' ? 'Confirmed' : 'Admitted at box office'}
         </p>
         <h2 className="text-bone-white font-normal mb-6"
           style={{ fontSize: '36px', lineHeight: 1.1, letterSpacing: '-0.02em' }}>
-          Reservation created.
+          {submittedSaleType === 'reservation' ? 'Reservation created.'
+            : submittedSaleType === 'door_now' ? 'Door sale done — let them in.'
+            : 'Paper sale entered.'}
         </h2>
         <p className="text-ash-gray font-light mb-8" style={{ fontSize: '17px' }}>
-          Download the ticket card and hand or send it to the buyer.
+          {submittedSaleType === 'reservation'
+            ? 'Download the ticket card and hand or send it to the buyer.'
+            : 'Already admitted — this QR shows "Already scanned" at the gate. No gate scan needed.'}
         </p>
 
         <div className="inline-block p-5 mb-6 animate-scale-in"
@@ -324,7 +364,7 @@ export function ReservationForm({ event, ticketTypes }: Props) {
             className="inline-flex items-center justify-center text-ash-gray font-light hover:text-bone-white transition-colors active:scale-[0.97] duration-100 ease-out"
             style={{ fontSize: '14px', padding: '14px 32px' }}
           >
-            Book next customer
+            {submittedSaleType === 'door_paper' ? 'Enter next paper sale' : 'Book next customer'}
           </button>
         </div>
       </div>
@@ -333,6 +373,38 @@ export function ReservationForm({ event, ticketTypes }: Props) {
 
   return (
     <form onSubmit={handleSubmit} noValidate>
+      <section className="mb-14">
+        <SectionLabel>Sale type</SectionLabel>
+        <div className="flex p-1 rounded-full mb-4" style={{ backgroundColor: '#1a1a1a', border: '1px solid #2a2a2a' }}>
+          {SALE_TYPES.map(t => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => chooseSaleType(t.value)}
+              aria-pressed={saleType === t.value}
+              className="flex-1 font-semibold uppercase transition-all duration-200"
+              style={{
+                fontSize: '11px', letterSpacing: '0.35px', padding: '8px 0', borderRadius: '20px',
+                backgroundColor: saleType === t.value ? (t.value === 'reservation' ? '#7c3aed' : '#ffb829') : 'transparent',
+                color: saleType === t.value ? (t.value === 'reservation' ? '#fff' : '#000') : '#555',
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <p className="font-light" style={{ fontSize: '14px', color: isDoorSale ? '#ffb829' : '#9a9a9a' }}>
+          {SALE_TYPES.find(t => t.value === saleType)!.hint}
+        </p>
+        {saleType === 'door_paper' && (
+          <div className="mt-6">
+            <LineInput id="paper_time" label="Time on the paper" type="datetime-local"
+              value={paperTime} onChange={v => { setPaperTime(v); setFieldErrors(p => ({ ...p, paper_time: undefined })) }}
+              error={fieldErrors.paper_time} />
+          </div>
+        )}
+      </section>
+
       <section className="mb-14">
         <SectionLabel>Select tickets</SectionLabel>
         <div>
@@ -407,10 +479,14 @@ export function ReservationForm({ event, ticketTypes }: Props) {
         className="inline-flex items-center justify-center bg-electric-iris text-bone-white font-semibold uppercase disabled:opacity-40 hover:opacity-90 active:scale-[0.97] transition-[transform,opacity] duration-100 ease-out"
         style={{ fontSize: '14px', letterSpacing: '0.025em', borderRadius: '24px', paddingTop: '14.4px', paddingBottom: '14.4px', paddingLeft: '32px', paddingRight: '32px', minWidth: '200px' }}>
         {status === 'submitting'
-          ? 'Creating reservation…'
-          : totalTickets > 0
-            ? `Confirm ${totalTickets} ticket${totalTickets > 1 ? 's' : ''}`
-            : 'Confirm reservation'}
+          ? (isDoorSale ? 'Admitting…' : 'Creating reservation…')
+          : saleType === 'door_now'
+            ? `Sell & admit${totalTickets > 0 ? ` ${totalTickets} ticket${totalTickets > 1 ? 's' : ''}` : ''}`
+            : saleType === 'door_paper'
+              ? `Enter paper sale${totalTickets > 0 ? ` · ${totalTickets} ticket${totalTickets > 1 ? 's' : ''}` : ''}`
+              : totalTickets > 0
+                ? `Confirm ${totalTickets} ticket${totalTickets > 1 ? 's' : ''}`
+                : 'Confirm reservation'}
       </button>
     </form>
   )

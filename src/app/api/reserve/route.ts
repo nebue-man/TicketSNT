@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateReservationInput } from '@/lib/utils/validate-reservation'
+import { validateDoorSale } from '@/lib/utils/validate-door-sale'
 import { createReservation } from '@/lib/data/reservations'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { Event } from '@/types/database'
@@ -41,7 +42,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: validation.error }, { status: 422 })
   }
 
-  const result = await createReservation(eventId, validation.data)
+  const doorSale = validateDoorSale((body as Record<string, unknown>).door_sale)
+  if (!doorSale.valid) {
+    return NextResponse.json({ error: doorSale.error }, { status: 422 })
+  }
+
+  const result = await createReservation(eventId, validation.data, doorSale.doorSale)
 
   if (!result.ok) {
     const status = result.error === 'capacity_exceeded' ? 409 : 400
