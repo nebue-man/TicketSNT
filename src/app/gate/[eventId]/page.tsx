@@ -38,53 +38,41 @@ export default async function GatePage({ params, searchParams }: Props) {
   const pinValid = pin === event.gate_pin
 
   return (
-    <main className="min-h-screen bg-void px-6 py-12">
-      <div className="max-w-[480px] mx-auto">
-
-        <div className="mb-10">
-          <span className="text-ash-gray font-semibold uppercase" style={{ fontSize: '14px', letterSpacing: '0.35px' }}>
-            SNT · Gate
+    <div className="min-h-screen bg-bg">
+      <header className="topbar px-6">
+        <div className="max-w-[480px] h-full mx-auto flex items-center justify-between">
+          <span className="flex items-center gap-3">
+            <span className="mark" aria-hidden="true">S</span>
+            <span className="brand">SNT Gate</span>
           </span>
+          <span className="text-[13px] font-medium text-muted tabular-nums">{dateStr} · {timeStr}</span>
+        </div>
+      </header>
+
+      <main className="max-w-[480px] mx-auto px-6 pt-8 pb-16">
+        <div className="mb-8">
+          <h1 className="h1">{event.name}</h1>
+          <p className="meta mt-1">{event.venue}</p>
         </div>
 
-        <header className="mb-10">
-          <p className="text-saffron-spark font-semibold uppercase mb-3" style={{ fontSize: '12px', letterSpacing: '0.35px' }}>
-            {dateStr} · {timeStr}
-          </p>
-          <h1 className="text-bone-white font-normal" style={{ fontSize: '27px', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
-            {event.name}
-          </h1>
-          <p className="text-ash-gray font-light mt-1" style={{ fontSize: '15px' }}>
-            {event.venue}
-          </p>
-        </header>
-
         {!pinProvided && (
-          <div>
-            <p className="text-lime-spark font-semibold uppercase mb-6" style={{ fontSize: '14px', letterSpacing: '0.35px' }}>
-              Gate access QR
+          <section className="card p-6" aria-labelledby="gate-qr-h">
+            <h2 id="gate-qr-h" className="h2 mb-2">Gate access QR</h2>
+            <p className="meta mb-6">
+              Show or send this QR to your gate staff. Scanning it opens the scanner directly, with no PIN to type.
             </p>
-            <p className="text-silver-mist font-light mb-8" style={{ fontSize: '15px' }}>
-              Show or send this QR to your gate staff. Scanning it opens the scanner directly — no PIN entry needed.
-            </p>
-            <div className="inline-block p-5 mb-6" style={{ background: '#ffffff', borderRadius: '16px' }}>
+            <div className="inline-block p-4 mb-4 bg-white rounded-md">
               <QRCode value={gateUrl} size={220} bgColor="#ffffff" fgColor="#000000" />
             </div>
-            <p className="text-ash-gray font-light" style={{ fontSize: '12px', wordBreak: 'break-all' }}>
-              {gateUrl}
-            </p>
-          </div>
+            <p className="mono text-[13px] text-muted break-all">{gateUrl}</p>
+          </section>
         )}
 
         {pinProvided && !pinValid && (
-          <div>
-            <p className="text-saffron-spark font-semibold uppercase mb-4" style={{ fontSize: '14px', letterSpacing: '0.35px' }}>
-              Invalid access link
-            </p>
-            <p className="text-ash-gray font-light" style={{ fontSize: '15px' }}>
-              This gate QR code is not valid for this event. Ask the organiser for the correct link.
-            </p>
-          </div>
+          <section className="notice p-6" role="alert">
+            <h2 className="h3 mb-1">Invalid access link</h2>
+            <p className="meta">This gate QR code is not valid for this event. Ask the organiser for the correct link.</p>
+          </section>
         )}
 
         {pinProvided && pinValid && (
@@ -93,8 +81,7 @@ export default async function GatePage({ params, searchParams }: Props) {
             <GateSignOut eventId={eventId} />
           </>
         )}
-
-      </div>
-    </main>
+      </main>
+    </div>
   )
 }

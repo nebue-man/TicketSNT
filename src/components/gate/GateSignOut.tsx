@@ -26,12 +26,11 @@ export function GateSignOut({ eventId }: { eventId: string }) {
   }
 
   return (
-    <form ref={formRef} action="/api/auth/logout" method="POST" className="mt-12">
+    <form ref={formRef} action="/api/auth/logout" method="POST" className="mt-10 pt-6 border-t border-line">
       <button
         type="button"
         onClick={() => void signOut()}
-        className="text-ash-gray font-semibold uppercase hover:text-bone-white transition-colors"
-        style={{ fontSize: '12px', letterSpacing: '0.35px' }}
+        className="navlink"
       >
         Sign out
       </button>

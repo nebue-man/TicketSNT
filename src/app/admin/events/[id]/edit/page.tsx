@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import { getAdminEvent } from '@/lib/data/admin/events'
 import { requireAuth } from '@/lib/auth'
 import EditEventForm from './EditEventForm'
@@ -10,14 +11,10 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
   if (!event) notFound()
 
   return (
-    <div>
-      <div className="mb-10">
-        <h1 className="text-bone-white font-normal" style={{ fontSize: '28px', letterSpacing: '-0.02em' }}>
-          Edit event
-        </h1>
-        <p className="text-ash-gray font-light mt-1" style={{ fontSize: '14px' }}>
-          {event.name}
-        </p>
+    <div className="max-w-[640px]">
+      <div className="mb-8">
+        <Link href={`/admin/events/${id}`} className="navlink">← {event.name}</Link>
+        <h1 className="h1 mt-1">Edit event</h1>
       </div>
       <EditEventForm event={event} />
     </div>

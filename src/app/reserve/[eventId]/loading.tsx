@@ -1,29 +1,22 @@
 export default function Loading() {
   return (
-    <main className="min-h-screen bg-void px-6 py-16">
-      <div className="max-w-[640px] mx-auto animate-pulse">
-        <div className="mb-16 h-4 w-32 bg-[#1a1a1a] rounded" />
-        <div className="mb-14 space-y-4">
-          <div className="h-3 w-16 bg-[#1a1a1a] rounded" />
-          <div className="h-10 w-3/4 bg-[#1a1a1a] rounded" />
-          <div className="h-4 w-56 bg-[#1a1a1a] rounded" />
-          <div className="h-4 w-40 bg-[#1a1a1a] rounded" />
+    <div className="min-h-screen bg-bg">
+      <div className="topbar" />
+      <main className="max-w-[1024px] mx-auto px-6 pt-10 pb-24 grid gap-10 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:gap-16 animate-pulse"
+        aria-busy="true" aria-label="Loading event">
+        <div>
+          <div className="aspect-[4/5] max-h-[320px] lg:max-h-none w-full rounded-md bg-surface mb-6" />
+          <div className="h-9 w-3/4 bg-surface rounded-sm mb-3" />
+          <div className="h-4 w-56 bg-surface rounded-sm mb-2" />
+          <div className="h-4 w-40 bg-surface rounded-sm" />
         </div>
-        <div className="h-3 w-24 bg-[#1a1a1a] rounded mb-6" />
-        {[1, 2, 3].map(i => (
-          <div key={i} className="flex items-center justify-between py-5 border-b border-[#1a1a1a]">
-            <div className="space-y-2">
-              <div className="h-4 w-36 bg-[#1a1a1a] rounded" />
-              <div className="h-3 w-20 bg-[#1a1a1a] rounded" />
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-8 h-8 rounded-full bg-[#1a1a1a]" />
-              <div className="w-5 h-4 bg-[#1a1a1a] rounded" />
-              <div className="w-8 h-8 rounded-full bg-[#1a1a1a]" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </main>
+        <div>
+          <div className="h-12 w-full bg-surface rounded-full mb-10" />
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-[76px] w-full bg-surface rounded-md mb-3" />
+          ))}
+        </div>
+      </main>
+    </div>
   )
 }

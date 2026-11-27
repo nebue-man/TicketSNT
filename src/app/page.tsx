@@ -15,24 +15,19 @@ function EventCard({ event }: { event: Event }) {
   })
 
   return (
-    <Link
-      href={`/reserve/${event.id}`}
-      className="block p-6 border border-[#1a1a1a] hover:border-[#333] active:scale-[0.99] transition-[border-color,transform] duration-150 ease-out animate-fade-in-up"
-      style={{ borderRadius: '16px' }}
-    >
-      <p className="text-lime-spark font-semibold uppercase mb-3"
-        style={{ fontSize: '11px', letterSpacing: '0.35px' }}>
-        {dateStr} · {timeStr}
-      </p>
-      <h2 className="text-bone-white font-normal mb-1"
-        style={{ fontSize: '22px', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
-        {event.name}
-      </h2>
-      <p className="text-ash-gray font-light"
-        style={{ fontSize: '14px' }}>
-        {event.venue}
-      </p>
-    </Link>
+    <li>
+      <Link href={`/reserve/${event.id}`} className="card card-link group flex items-center justify-between gap-6 p-6">
+        <div className="min-w-0">
+          <p className="text-[13px] font-medium text-accent tabular-nums mb-2">{dateStr} · {timeStr}</p>
+          <h2 className="h2 truncate">{event.name}</h2>
+          <p className="meta">{event.venue}</p>
+        </div>
+        <svg className="shrink-0 text-muted transition-transform duration-150 group-hover:translate-x-[3px] group-hover:text-ink"
+          width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M4 10h11m-4.5-4.5L15 10l-4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </Link>
+    </li>
   )
 }
 
@@ -41,63 +36,43 @@ export default async function HomePage() {
   const [events, role] = await Promise.all([getUpcomingEvents(), getSessionRole()])
 
   return (
-    <main className="min-h-screen bg-void px-6 py-16">
-      <div className="max-w-[640px] mx-auto">
-
-        <div className="flex items-center justify-between mb-14">
-          <div>
-            <p className="text-ash-gray font-semibold uppercase"
-              style={{ fontSize: '11px', letterSpacing: '0.35px' }}>
-              SNT Entertainment
-            </p>
-            <h1 className="text-bone-white font-normal mt-1"
-              style={{ fontSize: '28px', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
-              Select event
-            </h1>
+    <div className="min-h-screen bg-bg">
+      <header className="topbar px-6">
+        <div className="max-w-[640px] h-full mx-auto flex items-center justify-between">
+          <span className="flex items-center gap-3">
+            <span className="mark" aria-hidden="true">S</span>
+            <span className="brand">SNT Counter</span>
+          </span>
+          <div className="flex items-center gap-6">
+            {role === 'admin' && <Link href="/admin" className="navlink">Admin</Link>}
+            <form action="/api/auth/logout" method="POST">
+              <button type="submit" className="navlink">Sign out</button>
+            </form>
           </div>
-          <form action="/api/auth/logout" method="POST">
-            <button
-              type="submit"
-              className="text-ash-gray font-light hover:text-bone-white transition-colors"
-              style={{ fontSize: '13px' }}
-            >
-              Sign out
-            </button>
-          </form>
         </div>
+      </header>
+
+      <main className="max-w-[640px] mx-auto px-6 pt-12 pb-24">
+        <h1 className="h1 mb-2">Choose an event</h1>
+        <p className="meta mb-8">Book a reservation or sell at the door.</p>
 
         {events.length === 0 ? (
-          <p className="text-ash-gray font-light" style={{ fontSize: '15px' }}>
-            No upcoming events.{role === 'admin' && (
-              <> Create one in the{' '}
-                <Link href="/admin/events" className="text-electric-iris hover:underline">
-                  admin portal
-                </Link>
-                .
-              </>
+          <div className="card p-8 text-center">
+            <p className="h3">No upcoming events.</p>
+            {role === 'admin' && (
+              <p className="meta mt-1">
+                Create one in the <Link href="/admin/events" className="link">admin portal</Link>.
+              </p>
             )}
-          </p>
+          </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <ul className="flex flex-col gap-3">
             {events.map(event => (
               <EventCard key={event.id} event={event} />
             ))}
-          </div>
+          </ul>
         )}
-
-        {role === 'admin' && (
-          <div className="mt-16 pt-8 border-t border-[#1a1a1a]">
-            <Link
-              href="/admin"
-              className="text-ash-gray font-light hover:text-bone-white transition-colors"
-              style={{ fontSize: '13px' }}
-            >
-              Admin portal →
-            </Link>
-          </div>
-        )}
-
-      </div>
-    </main>
+      </main>
+    </div>
   )
 }

@@ -12,29 +12,17 @@ export default async function TiersPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-10">
-        <div>
-          <Link href={`/admin/events/${id}`}
-            className="text-ash-gray hover:text-bone-white transition-colors font-light mb-3 block"
-            style={{ fontSize: '13px' }}>
-            ← {event.name}
-          </Link>
-          <h1 className="text-bone-white font-normal"
-            style={{ fontSize: '28px', letterSpacing: '-0.02em' }}>
-            Ticket tiers
-          </h1>
-        </div>
+      <div className="mb-8">
+        <Link href={`/admin/events/${id}`} className="navlink">← {event.name}</Link>
+        <h1 className="h1 mt-1">Ticket tiers</h1>
       </div>
 
       <TiersList tiers={tiers} eventId={id} />
 
-      <div className="mt-10 pt-8 border-t border-[#1a1a1a]">
-        <p className="text-ash-gray font-semibold uppercase mb-6"
-          style={{ fontSize: '12px', letterSpacing: '0.35px' }}>
-          Add tier
-        </p>
+      <section className="card p-6 mt-10 max-w-[600px]" aria-labelledby="add-tier-h">
+        <h2 id="add-tier-h" className="h2 mb-6">Add a tier</h2>
         <AddTierForm eventId={id} existingSortOrder={tiers.length} />
-      </div>
+      </section>
     </div>
   )
 }
