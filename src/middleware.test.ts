@@ -75,8 +75,12 @@ describe('middleware matcher', () => {
     expect(matches('/zxing/zxing_reader.wasm')).toBe(false)
   })
 
+  it('skips the gate service worker so the browser can install it', () => {
+    expect(matches('/gate-sw.js')).toBe(false)
+  })
+
   it('still checks sessions on pages and APIs', () => {
-    for (const path of ['/', '/gate/evt-1', '/api/gate/scan', '/admin/events', '/zxing']) {
+    for (const path of ['/', '/gate/evt-1', '/api/gate/scan', '/api/gate/list', '/api/gate/offline-scans', '/admin/events', '/zxing']) {
       expect(matches(path)).toBe(true)
     }
   })

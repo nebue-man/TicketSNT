@@ -53,5 +53,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // zxing/ holds the gate scanner's QR decoder (.wasm) — a public static asset.
-  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|zxing/).*)'],
+  // gate-sw.js is the gate service worker; browsers fetch it without following redirects.
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|zxing/|gate-sw\\.js).*)'],
 }

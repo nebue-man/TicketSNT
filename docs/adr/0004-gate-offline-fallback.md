@@ -1,7 +1,7 @@
 # ADR-0004 — Gate scanning falls back to an on-phone ticket list when offline
 
 **Date:** 2026-11-26
-**Status:** Accepted (design in progress — see open questions in the grilling session)
+**Status:** Accepted — implemented (migration `0010_gate_offline_mode.sql`)
 
 The server is the source of truth for **Admissions**: `scan_reservation` admits each Reservation exactly once, across every gate, via a unique scan record. For sold-out shows of 2,000–3,000 guests the doors must not stop if mobile data collapses under the crowd, so each gate phone also keeps a downloaded copy of the event's ticket list and, when the server can't be reached, decides **Scan outcomes** on the phone and uploads them when the connection returns. A dedicated gate connection (venue Wi-Fi or a 4G router just for gate phones) remains the primary plan; offline mode is the fallback.
 
@@ -21,3 +21,13 @@ Offline mode is **manual**: gate staff download the **Gate list** before Doors a
 - **Door sales** made while offline are written on paper and entered later as already admitted, so they never appear in a Gate list as unused tickets.
 - An offline Admission that the server later finds was already admitted elsewhere is a **double entry**: it can't be undone, only recorded and reported to the organiser.
 - Door counts include offline Admissions only after they upload.
+
+## Implementation decisions (2026-11-27)
+
+- **Opens with no connection.** A service worker (`public/gate-sw.js`, scope `/gate/`) caches gate pages (network first, 4 s timeout) and the built JS and QR decoder (cache first), so a Gate phone can reopen the scanner offline once it has loaded it online. Scans and uploads always go to the network.
+- **Each Gate phone is named** by staff (e.g. "Gate A") plus a random 4-character id. The name appears in uploads and on the organiser's report.
+- **Missing from the Gate list means Not admitted** ("send to the box office"). Every Reservation from the Sales window is in the list, and Door sales are already admitted.
+- **Uploading twice is harmless.** If the response is lost and the phone retries, a scan this phone already uploaded comes back `already_uploaded`.
+- **Voided after download:** an Offline scan of a Reservation that was voided after the list was downloaded is reported (`voided`) but doesn't count as an Admission.
+- **Offline scans survive the wipe.** Sign-out and the 12 h wipe remove the Gate list (buyer names) but keep Offline scans that haven't uploaded. They hold only IDs and times, and losing them would lose Admissions.
+- **Organiser's report.** Double entries and voided Offline scans are listed on the admin event dashboard (`offline_scan_issues`).

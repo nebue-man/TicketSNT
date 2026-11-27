@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import QRCode from 'react-qr-code'
 import { getEventForGate } from '@/lib/data/events'
 import { GateScanner } from '@/components/gate/GateScanner'
+import { GateSignOut } from '@/components/gate/GateSignOut'
 import { requireAuth } from '@/lib/auth'
 
 interface Props {
@@ -87,7 +88,10 @@ export default async function GatePage({ params, searchParams }: Props) {
         )}
 
         {pinProvided && pinValid && (
-          <GateScanner eventId={eventId} pin={pin} />
+          <>
+            <GateScanner eventId={eventId} pin={pin} />
+            <GateSignOut eventId={eventId} />
+          </>
         )}
 
       </div>
