@@ -19,11 +19,20 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               Events
             </Link>
           </div>
-          <Link href="/"
-            className="text-ash-gray hover:text-bone-white transition-colors font-light"
-            style={{ fontSize: '13px' }}>
-            ← Counter
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/"
+              className="text-ash-gray hover:text-bone-white transition-colors font-light"
+              style={{ fontSize: '13px' }}>
+              ← Counter
+            </Link>
+            <form action="/api/auth/logout" method="POST">
+              <button type="submit"
+                className="text-ash-gray hover:text-bone-white transition-colors font-light"
+                style={{ fontSize: '13px' }}>
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
       </nav>
       <main className="max-w-[1024px] mx-auto px-6 py-12">
