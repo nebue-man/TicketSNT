@@ -16,15 +16,22 @@ function StatusBadge({ status }: { status: EventStatus }) {
   )
 }
 
-export default async function AdminEventsPage() {
-  const events = await getAllEvents()
+export default async function AdminEventsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const showArchived = (await searchParams).archived === '1'
+  const allEvents = await getAllEvents()
+  const archivedCount = allEvents.filter(e => e.status === 'archived').length
+  const events = allEvents.filter(e => (e.status === 'archived') === showArchived)
 
   return (
     <div>
       <div className="flex items-center justify-between mb-10">
         <h1 className="text-bone-white font-normal"
           style={{ fontSize: '28px', letterSpacing: '-0.02em' }}>
-          Events
+          {showArchived ? 'Archived events' : 'Events'}
         </h1>
         <Link href="/admin/events/new"
           className="inline-flex items-center gap-2 bg-electric-iris text-bone-white font-semibold uppercase active:scale-[0.97] transition-transform duration-100 ease-out"
@@ -33,8 +40,18 @@ export default async function AdminEventsPage() {
         </Link>
       </div>
 
+      {(showArchived || archivedCount > 0) && (
+        <Link href={showArchived ? '/admin/events' : '/admin/events?archived=1'}
+          className="inline-block text-ash-gray hover:text-bone-white transition-colors font-light mb-6"
+          style={{ fontSize: '13px' }}>
+          {showArchived ? '← Back to events' : `Show archived (${archivedCount})`}
+        </Link>
+      )}
+
       {events.length === 0 ? (
-        <p className="text-ash-gray font-light" style={{ fontSize: '15px' }}>No events yet.</p>
+        <p className="text-ash-gray font-light" style={{ fontSize: '15px' }}>
+          {showArchived ? 'No archived events.' : 'No events yet.'}
+        </p>
       ) : (
         <div className="flex flex-col gap-3">
           {events.map(event => {

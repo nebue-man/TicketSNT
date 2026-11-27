@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
-import { updateEvent, closeEvent } from '@/lib/data/admin/events'
-import type { EventInsert } from '@/lib/data/admin/events'
+import { updateEvent, closeEvent, deleteEvent, archiveEvent, restoreEvent } from '@/lib/data/admin/events'
+import type { EventInsert, EventLifecycleResult } from '@/lib/data/admin/events'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await requireAuth('admin')
@@ -25,6 +25,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ ok: true })
 }
 
+function lifecycleResponse(result: EventLifecycleResult) {
+  if (result.ok) return NextResponse.json({ ok: true })
+  return NextResponse.json({ error: result.error }, { status: result.status })
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await requireAuth('admin')
   const { id } = await params
@@ -34,5 +39,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!ok) return NextResponse.json({ error: 'Failed to close event' }, { status: 500 })
     return NextResponse.json({ ok: true })
   }
+  if (body.action === 'archive') return lifecycleResponse(await archiveEvent(id))
+  if (body.action === 'restore') return lifecycleResponse(await restoreEvent(id))
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  await requireAuth('admin')
+  const { id } = await params
+  return lifecycleResponse(await deleteEvent(id))
 }

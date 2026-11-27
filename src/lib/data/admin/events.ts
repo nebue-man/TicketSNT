@@ -79,3 +79,41 @@ export async function closeEvent(id: string): Promise<boolean> {
   if (error) console.error('[closeEvent] rpc error:', error)
   return !error
 }
+
+export type EventLifecycleResult = { ok: true } | { ok: false; error: string; status: number }
+
+async function runLifecycleRpc(fn: string, id: string, messages: Record<string, [string, number]>): Promise<EventLifecycleResult> {
+  const supabase = createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc(fn, { p_id: id })
+  if (error) {
+    console.error(`[${fn}] rpc error:`, error)
+    return { ok: false, error: 'Something went wrong. Please try again.', status: 500 }
+  }
+  if (data === 'ok') return { ok: true }
+  const [message, status] = messages[data as string] ?? ['Something went wrong. Please try again.', 500]
+  return { ok: false, error: message, status }
+}
+
+const NOT_FOUND: [string, number] = ['Event not found', 404]
+
+/** Deletes an event made by mistake. Refused once it has any Reservation. */
+export function deleteEvent(id: string) {
+  return runLifecycleRpc('admin_delete_event', id, {
+    not_found: NOT_FOUND,
+    has_reservations: ['This event has reservations, so it can’t be deleted. Archive it instead.', 409],
+  })
+}
+
+/** Hides an ended event from the admin list, keeping all its records. */
+export function archiveEvent(id: string) {
+  return runLifecycleRpc('admin_archive_event', id, { not_found: NOT_FOUND })
+}
+
+/** Brings an archived event back as closed (sales stay shut). */
+export function restoreEvent(id: string) {
+  return runLifecycleRpc('admin_restore_event', id, {
+    not_found: NOT_FOUND,
+    not_archived: ['This event isn’t archived.', 409],
+  })
+}
