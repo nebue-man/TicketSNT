@@ -4,12 +4,15 @@ import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from '
 import type { ScanResult } from '@/lib/data/gate'
 import { createQrDecoder } from './qr-decoder'
 import { unlockAudio, cueRead, cueAdmitted, cueProblem } from './gate-feedback'
+import { useGateOffline } from './useGateOffline'
+import { OfflinePanel } from './OfflinePanel'
+import type { OfflineScanOutcome } from '@/lib/gate-offline/gate-list'
 
 type AdmittedResult = Extract<ScanResult, { ok: true }>
 
 /** What the gate screen shows after a Scan (see GLOSSARY.md: Scan outcome). */
 type ScanOutcome =
-  | { kind: 'admitted'; result: AdmittedResult }              // Admitted, or Already scanned (Re-scan)
+  | { kind: 'admitted'; result: AdmittedResult; offline?: boolean } // Admitted, or Already scanned (Re-scan)
   | { kind: 'denied'; reservationId: string; message: string } // Not admitted, with reason
   | { kind: 'not_checked'; reservationId: string }             // network failure / timeout
 
@@ -47,20 +50,47 @@ function outcomeReservationId(outcome: ScanOutcome): string {
   return outcome.kind === 'admitted' ? outcome.result.reservation.id : outcome.reservationId
 }
 
+/** An Offline scan shown on the same screens as an online one. */
+function fromOfflineOutcome(o: OfflineScanOutcome): ScanOutcome {
+  if (o.kind === 'denied') return { kind: 'denied', reservationId: o.reservationId, message: o.message }
+  const reservation = { id: o.reservationId, buyer_name: o.entry.buyerName, buyer_email: '', buyer_phone: '', items: o.entry.items }
+  return o.kind === 'admitted'
+    ? { kind: 'admitted', offline: true, result: { ok: true, reservation, alreadyScanned: false } }
+    : { kind: 'admitted', offline: true, result: { ok: true, reservation, alreadyScanned: true, scannedAt: o.admittedAt } }
+}
+
 export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) {
   const [view, setView] = useState<View>({ phase: 'scan' })
   const [manualId, setManualId] = useState('')
   const [cameraError, setCameraError] = useState('')
   const muted = useSyncExternalStore(subscribeMute, isMuted, () => false)
+  const offline = useGateOffline(eventId, pin)
+  const offlineMode = offline.state.mode === 'offline'
+  const { scanOffline } = offline
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const busyRef = useRef(false) // true while checking or showing a result: decoding is paused
   const ignoreRef = useRef<{ id: string; until: number } | null>(null)
 
+  // The service worker lets this page open with no connection (ADR-0004).
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return
+    navigator.serviceWorker.register('/gate-sw.js', { scope: '/gate/' }).catch(() => {})
+  }, [])
+
   const check = useCallback(async (reservationId: string) => {
     if (busyRef.current) return
     busyRef.current = true
     videoRef.current?.pause() // freeze the frame; the camera stream stays on
+
+    if (offlineMode) {
+      const outcome = fromOfflineOutcome(scanOffline(reservationId))
+      if (outcome.kind === 'admitted' && !outcome.result.alreadyScanned) cueAdmitted(isMuted())
+      else cueProblem(isMuted())
+      setView({ phase: 'result', outcome })
+      return
+    }
+
     setView({ phase: 'checking', reservationId })
 
     const ctrl = new AbortController()
@@ -86,7 +116,7 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
     if (outcome.kind === 'admitted' && !outcome.result.alreadyScanned) cueAdmitted(isMuted())
     else cueProblem(isMuted())
     setView({ phase: 'result', outcome })
-  }, [eventId, pin])
+  }, [eventId, pin, offlineMode, scanOffline])
 
   const checkRef = useRef(check)
   useEffect(() => { checkRef.current = check }, [check])
@@ -172,10 +202,21 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
     setMuted(!muted)
   }
 
+  // From a "Not checked" screen: switch this phone to offline mode, then scan again.
+  async function goOfflineAndScan() {
+    await offline.goOffline()
+    setManualId('')
+    setView({ phase: 'scan' })
+    busyRef.current = false
+    void videoRef.current?.play().catch(() => {})
+  }
+
   const checkingId = view.phase === 'checking' ? view.reservationId : null
 
   return (
     <div onPointerDown={unlockAudio}>
+      <OfflinePanel offline={offline} />
+
       {/* ── Scan screen (always mounted so the camera keeps running) ───────── */}
       <div className="flex items-center justify-between mb-6">
         <p className="text-ash-gray font-semibold uppercase" style={{ fontSize: '14px', letterSpacing: '0.35px' }}>
@@ -242,16 +283,24 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
 
       {/* ── Full-screen Scan outcome ─────────────────────────────────────────── */}
       {view.phase === 'result' && (
-        <OutcomeScreen outcome={view.outcome} onScanNext={scanNext} onRetry={retry} />
+        <OutcomeScreen
+          outcome={view.outcome}
+          onScanNext={scanNext}
+          onRetry={retry}
+          onGoOffline={offline.state.list ? goOfflineAndScan : undefined}
+          goingOffline={offline.action === 'go_offline'}
+        />
       )}
     </div>
   )
 }
 
-function OutcomeScreen({ outcome, onScanNext, onRetry }: {
+function OutcomeScreen({ outcome, onScanNext, onRetry, onGoOffline, goingOffline }: {
   outcome: ScanOutcome
   onScanNext: () => void
   onRetry: (reservationId: string) => void
+  onGoOffline?: () => void
+  goingOffline?: boolean
 }) {
   let bg: string, fg: string, label: string, headline: string, sub: string
   let items: AdmittedResult['reservation']['items'] = []
@@ -267,6 +316,7 @@ function OutcomeScreen({ outcome, onScanNext, onRetry }: {
     } else {
       bg = '#b9ff4b'; fg = '#000000'; label = 'Admitted'
     }
+    if (outcome.offline) label += ' · offline'
   } else if (outcome.kind === 'denied') {
     bg = '#e5383b'; fg = '#ffffff'; label = 'Not admitted'
     headline = outcome.message; sub = outcome.reservationId
@@ -300,6 +350,16 @@ function OutcomeScreen({ outcome, onScanNext, onRetry }: {
             style={{ ...buttonStyle, background: fg, color: bg }}
           >
             Retry
+          </button>
+        )}
+        {retryId && onGoOffline && (
+          <button
+            onClick={onGoOffline}
+            disabled={goingOffline}
+            className="w-full font-semibold uppercase active:scale-[0.97] transition-transform duration-100 ease-out disabled:opacity-50"
+            style={{ ...buttonStyle, background: 'transparent', color: fg, border: `2px solid ${fg}` }}
+          >
+            {goingOffline ? 'Switching…' : 'Switch to offline mode'}
           </button>
         )}
         <button

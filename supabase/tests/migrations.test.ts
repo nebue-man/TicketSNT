@@ -7,7 +7,7 @@ const PERMISSION_DENIED = /permission denied/
 describe('migrations', () => {
   it('apply cleanly from 0001 to the latest', async () => {
     const db = await createDb()
-    expect(migrationFiles.at(-1)).toMatch(/^0009_/)
+    expect(migrationFiles.at(-1)).toMatch(/^0010_/)
     await db.close()
   })
 
