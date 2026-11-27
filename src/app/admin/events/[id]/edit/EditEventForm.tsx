@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { generatePin } from '@/lib/utils/generate-pin'
+import { NumberInput } from '@/components/NumberInput'
 import type { Event } from '@/types/database'
 
 // datetime-local inputs expect 'YYYY-MM-DDTHH:MM' (no seconds/tz)
@@ -179,12 +180,11 @@ export default function EditEventForm({ event }: { event: Event }) {
         <label className={labelClass} style={{ fontSize: '12px', letterSpacing: '0.35px' }}>
           Max tickets per reservation
         </label>
-        <input
-          type="number"
+        <NumberInput
           min={1}
           max={20}
           value={maxPer}
-          onChange={e => { const v = parseInt(e.target.value, 10); if (!isNaN(v) && v >= 1) setMaxPer(v) }}
+          onChange={setMaxPer}
           className={inputClass}
           style={{ fontSize: '18px' }}
         />
