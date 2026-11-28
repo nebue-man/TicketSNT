@@ -29,8 +29,12 @@ Any **Scan** of a **Reservation** that already has an **Admission**; shown with 
 _Avoid_: Duplicate, double scan
 
 **Scan outcome**:
-What the gate screen shows after a **Scan**: Admitted, Already scanned (a **Re-scan**), or Not admitted with a reason.
+What the gate screen shows after a **Scan**: Admitted, Already scanned (a **Re-scan**), Not admitted with a reason, or **Not checked**.
 _Avoid_: QR result, scan result
+
+**Not checked**:
+The **Scan outcome** when a **Scan** never reached the server and the **Gate phone** isn't in offline mode, so nothing was decided: the guest is neither admitted nor turned away.
+_Avoid_: Network error, failed scan
 
 **Gate phone**:
 A phone used by gate staff to **Scan** tickets for one event; plan one per 400 guests plus spares.

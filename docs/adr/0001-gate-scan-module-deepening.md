@@ -1,7 +1,7 @@
 # ADR-0001 — Deepen gate.ts into a resolved ScanOutcome module
 
 **Date:** 2026-11-19  
-**Status:** Proposed  
+**Status:** Superseded by ADR-0005 (2026-11-28)  
 **Strength:** Strong
 
 ## Context

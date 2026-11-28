@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { decideOfflineScan, offlineDoorCount, toGateList, type GateList, type OfflineScanOutcome } from '@/lib/gate-offline/gate-list'
-import type { GateDoorCount } from '@/lib/data/gate'
+import type { OfflineScanning } from '@/lib/gate-scan/scanner'
 import {
   readGateState, writeGateState, readGatePhone, saveGatePhoneName, gatePhoneLabel,
   EMPTY_GATE_STATE, type GateState, type GatePhone,
@@ -182,23 +182,28 @@ export function useGateOffline(eventId: string, pin: string) {
    */
   const scanOffline = useCallback((reservationId: string): OfflineScanOutcome => {
     const current = stateRef.current
-    if (!current.list) return { kind: 'denied', reservationId, message: 'No gate list on this phone' }
+    if (!current.list) return { kind: 'denied', reservationId, reason: 'no_gate_list' }
     const outcome = decideOfflineScan(current.list, current.scans, reservationId)
     if (outcome.kind === 'admitted') {
       try {
         commit({ ...current, scans: [...current.scans, { reservationId: outcome.reservationId, scannedAt: new Date().toISOString() }] })
       } catch {
-        return { kind: 'denied', reservationId: outcome.reservationId, message: "Couldn't save on this phone — write the ID down and admit manually" }
+        return { kind: 'denied', reservationId: outcome.reservationId, reason: 'not_saved' }
       }
     }
     return outcome
   }, [commit])
 
-  /** The approximate Door count this phone knows offline, including Offline scans just saved. */
-  const offlineCount = useCallback((): GateDoorCount | null => {
-    const current = stateRef.current
-    return current.list ? offlineDoorCount(current.list, current.scans) : null
-  }, [])
+  /** What the gate-scan module asks this phone about offline mode; reads live state, so it never goes stale. */
+  const scanning = useMemo<OfflineScanning>(() => ({
+    inOfflineMode: () => stateRef.current.mode === 'offline',
+    scan: scanOffline,
+    // The approximate Door count, including Offline scans just saved.
+    count: () => {
+      const current = stateRef.current
+      return current.list ? offlineDoorCount(current.list, current.scans) : null
+    },
+  }), [scanOffline])
 
-  return { state, phone, action, message, nameThisPhone, download, goOffline, goOnline, scanOffline, offlineCount, dismissMessage: () => setMessage(null) }
+  return { state, phone, action, message, nameThisPhone, download, goOffline, goOnline, scanning, dismissMessage: () => setMessage(null) }
 }

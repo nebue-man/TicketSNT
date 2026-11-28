@@ -31,7 +31,7 @@ describe('decideOfflineScan', () => {
   })
 
   it('does not admit a voided Reservation', () => {
-    expect(decideOfflineScan(list, [], 'RES-CCCCCC')).toMatchObject({ kind: 'denied', message: 'This reservation has been voided' })
+    expect(decideOfflineScan(list, [], 'RES-CCCCCC')).toMatchObject({ kind: 'denied', reason: 'voided' })
   })
 
   it('does not admit a Reservation missing from the list', () => {
