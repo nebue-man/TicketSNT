@@ -2,7 +2,7 @@
 // Doors, and how an Offline scan is decided from it. Pure — no storage, no
 // network — so it runs the same on the phone and in tests.
 
-import type { GateDoorCount } from '@/lib/data/gate'
+import type { GateDoorCount, NotAdmittedReason } from '@/lib/gate-scan/outcome'
 
 export interface GateListItem {
   ticket_type_name: string
@@ -32,7 +32,10 @@ export interface OfflineScan {
 export type OfflineScanOutcome =
   | { kind: 'admitted'; reservationId: string; entry: GateListEntry }
   | { kind: 'already_scanned'; reservationId: string; entry: GateListEntry; admittedAt: string }
-  | { kind: 'denied'; reservationId: string; message: string }
+  | { kind: 'denied'; reservationId: string; reason: OfflineNotAdmittedReason }
+
+/** Why an Offline scan was Not admitted; the gate-scan module turns it into staff words. */
+export type OfflineNotAdmittedReason = Extract<NotAdmittedReason, 'not_in_gate_list' | 'voided' | 'no_gate_list' | 'not_saved'>
 
 export const GATE_LIST_TTL_AFTER_DOORS_MS = 12 * 60 * 60 * 1000
 
@@ -48,8 +51,8 @@ export function decideOfflineScan(
 ): OfflineScanOutcome {
   const id = reservationId.trim().toUpperCase()
   const entry = list.reservations[id]
-  if (!entry) return { kind: 'denied', reservationId: id, message: 'Not in the gate list — send to the box office' }
-  if (entry.void) return { kind: 'denied', reservationId: id, message: 'This reservation has been voided' }
+  if (!entry) return { kind: 'denied', reservationId: id, reason: 'not_in_gate_list' }
+  if (entry.void) return { kind: 'denied', reservationId: id, reason: 'voided' }
 
   const own = offlineScans.find(s => s.reservationId === id)
   const admittedAt = entry.admittedAt ?? own?.scannedAt ?? null
