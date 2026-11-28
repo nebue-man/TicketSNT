@@ -1,44 +1,20 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react'
-import type { GateDoorCount, ScanResult } from '@/lib/data/gate'
+import { createGateScan, fetchScan } from '@/lib/gate-scan/phone'
+import type { GateScanResult, ScanItem, ScanOutcome, ShownDoorCount } from '@/lib/gate-scan/outcome'
 import { createQrDecoder } from './qr-decoder'
 import { unlockAudio, cueRead, cueAdmitted, cueProblem } from './gate-feedback'
 import { useGateOffline } from './useGateOffline'
 import { OfflinePanel } from './OfflinePanel'
-import type { OfflineScanOutcome } from '@/lib/gate-offline/gate-list'
-
-type AdmittedResult = Extract<ScanResult, { ok: true }>
-
-/** What the gate screen shows after a Scan (see GLOSSARY.md: Scan outcome). */
-type ScanOutcome =
-  | { kind: 'admitted'; result: AdmittedResult; offline?: boolean } // Admitted, or Already scanned (Re-scan)
-  | { kind: 'denied'; reservationId: string; message: string } // Not admitted, with reason
-  | { kind: 'not_checked'; reservationId: string }             // network failure / timeout
-
-/** The Door count shown with a Scan outcome (GLOSSARY.md: Door count). */
-type ShownDoorCount =
-  | { kind: 'live'; count: GateDoorCount }    // sent with this Scan's response
-  | { kind: 'stale'; count: GateDoorCount }   // last one received; this Scan didn't reach the server
-  | { kind: 'offline'; count: GateDoorCount } // approximate, from this phone's Gate list
-  | { kind: 'unavailable' }                   // count failed, or the PIN couldn't be checked
-  | { kind: 'hidden' }                        // wrong PIN: no section at all
 
 type View =
   | { phase: 'scan' }
   | { phase: 'checking'; reservationId: string }
-  | { phase: 'result'; outcome: ScanOutcome; doorCount: ShownDoorCount }
+  | ({ phase: 'result' } & GateScanResult)
 
-const SCAN_TIMEOUT_MS = 5000
 const SAME_TICKET_GUARD_MS = 3000
 const MUTE_KEY = 'snt-gate-muted'
-
-const DENIED_MESSAGES: Record<string, string> = {
-  invalid_pin: 'Incorrect gate PIN',
-  not_found: 'Reservation not found',
-  wrong_event: 'Ticket is for a different event',
-  voided: 'This reservation has been voided',
-}
 
 // Sound on/off, remembered per device.
 const muteListeners = new Set<() => void>()
@@ -54,28 +30,6 @@ function setMuted(muted: boolean) {
   muteListeners.forEach(l => l())
 }
 
-/** Reads `doorCount` from a scan response: absent means hidden, null means unavailable. */
-function toGateDoorCount(data: unknown): GateDoorCount | null | undefined {
-  if (!data || typeof data !== 'object' || !('doorCount' in data)) return undefined
-  const c = (data as { doorCount: unknown }).doorCount as Partial<GateDoorCount> | null
-  return c && Number.isFinite(c.ticketsAdmitted) && Number.isFinite(c.ticketsSold)
-    ? { ticketsAdmitted: c.ticketsAdmitted!, ticketsSold: c.ticketsSold! }
-    : null
-}
-
-function outcomeReservationId(outcome: ScanOutcome): string {
-  return outcome.kind === 'admitted' ? outcome.result.reservation.id : outcome.reservationId
-}
-
-/** An Offline scan shown on the same screens as an online one. */
-function fromOfflineOutcome(o: OfflineScanOutcome): ScanOutcome {
-  if (o.kind === 'denied') return { kind: 'denied', reservationId: o.reservationId, message: o.message }
-  const reservation = { id: o.reservationId, buyer_name: o.entry.buyerName, buyer_email: '', buyer_phone: '', items: o.entry.items }
-  return o.kind === 'admitted'
-    ? { kind: 'admitted', offline: true, result: { ok: true, reservation, alreadyScanned: false } }
-    : { kind: 'admitted', offline: true, result: { ok: true, reservation, alreadyScanned: true, scannedAt: o.admittedAt } }
-}
-
 export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) {
   const [view, setView] = useState<View>({ phase: 'scan' })
   const [manualId, setManualId] = useState('')
@@ -83,9 +37,12 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
   const muted = useSyncExternalStore(subscribeMute, isMuted, () => false)
   const offline = useGateOffline(eventId, pin)
   const offlineMode = offline.state.mode === 'offline'
-  const { scanOffline, offlineCount } = offline
+  // One gate-scan module per page: it remembers the last live Door count between Scans.
+  // Created exactly once (a lazy useState, not useMemo, which React may discard),
+  // so the last live Door count survives between Scans. The offline adapter reads
+  // live state, so the first one stays correct.
+  const [gateScan] = useState(() => createGateScan({ eventId, pin, send: fetchScan, offline: offline.scanning }))
 
-  const lastCountRef = useRef<GateDoorCount | null>(null) // last live Door count, for "Not checked"
   const videoRef = useRef<HTMLVideoElement>(null)
   const busyRef = useRef(false) // true while checking or showing a result: decoding is paused
   const ignoreRef = useRef<{ id: string; until: number } | null>(null)
@@ -101,47 +58,12 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
     busyRef.current = true
     videoRef.current?.pause() // freeze the frame; the camera stream stays on
 
-    if (offlineMode) {
-      const outcome = fromOfflineOutcome(scanOffline(reservationId))
-      if (outcome.kind === 'admitted' && !outcome.result.alreadyScanned) cueAdmitted(isMuted())
-      else cueProblem(isMuted())
-      const count = offlineCount()
-      setView({ phase: 'result', outcome, doorCount: count ? { kind: 'offline', count } : { kind: 'unavailable' } })
-      return
-    }
-
-    setView({ phase: 'checking', reservationId })
-
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), SCAN_TIMEOUT_MS)
-    let outcome: ScanOutcome
-    let doorCount: ShownDoorCount
-    try {
-      const res = await fetch('/api/gate/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reservationId, eventId, gatePin: pin }),
-        signal: ctrl.signal,
-      })
-      const data = await res.json()
-      outcome = res.ok
-        ? { kind: 'admitted', result: data as AdmittedResult }
-        : { kind: 'denied', reservationId, message: DENIED_MESSAGES[data?.error] ?? 'Something went wrong' }
-      const count = toGateDoorCount(data)
-      if (count) lastCountRef.current = count
-      doorCount = count ? { kind: 'live', count } : count === null ? { kind: 'unavailable' } : { kind: 'hidden' }
-    } catch {
-      outcome = { kind: 'not_checked', reservationId }
-      const last = lastCountRef.current
-      doorCount = last ? { kind: 'stale', count: last } : { kind: 'unavailable' }
-    } finally {
-      clearTimeout(timer)
-    }
-
-    if (outcome.kind === 'admitted' && !outcome.result.alreadyScanned) cueAdmitted(isMuted())
+    if (!offlineMode) setView({ phase: 'checking', reservationId })
+    const result = await gateScan.scan(reservationId)
+    if (result.outcome.kind === 'admitted') cueAdmitted(isMuted())
     else cueProblem(isMuted())
-    setView({ phase: 'result', outcome, doorCount })
-  }, [eventId, pin, offlineMode, scanOffline, offlineCount])
+    setView({ phase: 'result', ...result })
+  }, [gateScan, offlineMode])
 
   const checkRef = useRef(check)
   useEffect(() => { checkRef.current = check }, [check])
@@ -201,7 +123,7 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
     unlockAudio()
     if (view.phase === 'result') {
       // The guest's QR is often still in view — don't re-read it straight away.
-      ignoreRef.current = { id: outcomeReservationId(view.outcome), until: Date.now() + SAME_TICKET_GUARD_MS }
+      ignoreRef.current = { id: view.outcome.reservationId, until: Date.now() + SAME_TICKET_GUARD_MS }
     }
     setManualId('')
     setView({ phase: 'scan' })
@@ -339,21 +261,20 @@ function OutcomeScreen({ outcome, doorCount, onScanNext, onRetry, onGoOffline, g
 }) {
   let bg: string, fg: string, label: string, headline: string, sub: string
   let icon: 'tick' | 'repeat' | 'cross'
-  let items: AdmittedResult['reservation']['items'] = []
+  let items: ScanItem[] = []
 
-  if (outcome.kind === 'admitted') {
-    const { result } = outcome
-    items = result.reservation.items
-    headline = result.reservation.buyer_name
-    sub = result.reservation.id
-    if (result.alreadyScanned) {
-      const at = new Date(result.scannedAt).toLocaleTimeString('en-LK', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Colombo' })
+  if (outcome.kind === 'admitted' || outcome.kind === 'already_scanned') {
+    items = outcome.items
+    headline = outcome.buyerName
+    sub = outcome.reservationId
+    if (outcome.kind === 'already_scanned') {
+      const at = new Date(outcome.admittedAt).toLocaleTimeString('en-LK', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Colombo' })
       bg = 'var(--color-warn)'; fg = '#0f0f0f'; label = `Already scanned · ${at}`; icon = 'repeat'
     } else {
       bg = 'var(--color-ok)'; fg = '#0f0f0f'; label = 'Admitted'; icon = 'tick'
     }
     if (outcome.offline) label += ' · offline'
-  } else if (outcome.kind === 'denied') {
+  } else if (outcome.kind === 'not_admitted') {
     bg = 'var(--color-danger)'; fg = '#ffffff'; label = 'Not admitted'; icon = 'cross'
     headline = outcome.message; sub = outcome.reservationId
   } else {

@@ -1,21 +1,18 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getDoorCount } from '@/lib/data/admin/door-count'
+import type { ScanWire, WireDoorCount } from '@/lib/gate-scan/outcome'
+
+export type { GateDoorCount } from '@/lib/gate-scan/outcome'
 
 export type ScanResult =
   | { ok: true; reservation: ScannedReservation; alreadyScanned: false }
   | { ok: true; reservation: ScannedReservation; alreadyScanned: true; scannedAt: string }
   | { ok: false; error: 'invalid_pin' | 'not_found' | 'wrong_event' | 'voided' | 'unknown' }
 
-/** The Door count as a Gate phone shows it on the Scan outcome screen. */
-export interface GateDoorCount {
-  ticketsAdmitted: number
-  ticketsSold: number
-}
-
+/** What a Gate phone may know about a scanned Reservation: no email or phone (ADR-0004). */
 export interface ScannedReservation {
   id: string
   buyer_name: string
-  buyer_email: string
-  buyer_phone: string
   items: { ticket_type_name: string; quantity: number }[]
 }
 
@@ -26,8 +23,6 @@ interface ScanPayload {
   code: ScanCode
   reservation_id?: string
   buyer_name?: string
-  buyer_email?: string
-  buyer_phone?: string
   items?: { ticket_type_name: string; quantity: number }[]
   scanned_at?: string
 }
@@ -56,11 +51,9 @@ export async function scanReservation(
 
   if (data.code === 'admitted' || data.code === 'already_scanned') {
     const reservation: ScannedReservation = {
-      id:          data.reservation_id!,
-      buyer_name:  data.buyer_name!,
-      buyer_email: data.buyer_email!,
-      buyer_phone: data.buyer_phone!,
-      items:       data.items ?? [],
+      id:         data.reservation_id!,
+      buyer_name: data.buyer_name!,
+      items:      data.items ?? [],
     }
     if (data.code === 'already_scanned') {
       return { ok: true, reservation, alreadyScanned: true, scannedAt: data.scanned_at! }
@@ -69,4 +62,49 @@ export async function scanReservation(
   }
 
   return { ok: false, error: ERROR_CODES[data.code] ?? 'unknown' }
+}
+
+// The Scan is already recorded when the count is loaded: a slow count must not
+// push the answer past the phone's SCAN_TIMEOUT_MS (gate-scan/phone.ts) and show a false Not checked.
+const DOOR_COUNT_TIMEOUT_MS = 1500
+
+async function loadDoorCount(eventId: string): Promise<WireDoorCount> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const count = await Promise.race([
+      getDoorCount(eventId),
+      new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), DOOR_COUNT_TIMEOUT_MS) }),
+    ])
+    return count
+      ? { status: 'live', ticketsAdmitted: count.ticketsAdmitted, ticketsSold: count.ticketsSold }
+      : { status: 'unavailable' }
+  } catch {
+    return { status: 'unavailable' }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * The server half of the gate-scan module (ADR-0005): records a Scan and answers
+ * with its Scan outcome and the Door count after it. null when the database
+ * decided nothing; the phone then shows Not checked. The Door count is
+ * withheld for a wrong gate PIN.
+ */
+export async function decideScan(reservationId: string, eventId: string, gatePin: string): Promise<ScanWire | null> {
+  const id = reservationId.trim().toUpperCase()
+  const result = await scanReservation(id, eventId, gatePin)
+  if (!result.ok) {
+    const reason = result.error
+    if (reason === 'unknown') return null
+    if (reason === 'invalid_pin') return { outcome: 'not_admitted', reservationId: id, reason, doorCount: { status: 'withheld' } }
+    return { outcome: 'not_admitted', reservationId: id, reason, doorCount: await loadDoorCount(eventId) }
+  }
+
+  const doorCount = await loadDoorCount(eventId)
+
+  const reservation = { id: result.reservation.id, buyerName: result.reservation.buyer_name, items: result.reservation.items }
+  return result.alreadyScanned
+    ? { outcome: 'already_scanned', reservation, admittedAt: result.scannedAt, doorCount }
+    : { outcome: 'admitted', reservation, doorCount }
 }
