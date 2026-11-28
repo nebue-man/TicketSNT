@@ -70,7 +70,7 @@ function outcomeReservationId(outcome: ScanOutcome): string {
 /** An Offline scan shown on the same screens as an online one. */
 function fromOfflineOutcome(o: OfflineScanOutcome): ScanOutcome {
   if (o.kind === 'denied') return { kind: 'denied', reservationId: o.reservationId, message: o.message }
-  const reservation = { id: o.reservationId, buyer_name: o.entry.buyerName, buyer_email: '', buyer_phone: '', items: o.entry.items }
+  const reservation = { id: o.reservationId, buyer_name: o.entry.buyerName, items: o.entry.items }
   return o.kind === 'admitted'
     ? { kind: 'admitted', offline: true, result: { ok: true, reservation, alreadyScanned: false } }
     : { kind: 'admitted', offline: true, result: { ok: true, reservation, alreadyScanned: true, scannedAt: o.admittedAt } }
