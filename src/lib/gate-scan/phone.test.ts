@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createGateScan, type ScanSend, type OfflineScanning } from './scanner'
+import { createGateScan, type ScanSend, type OfflineScanning } from './phone'
 import type { ScanWire } from './outcome'
 
 const RES = { id: 'RES-AAAAAA', buyerName: 'Amal', items: [{ ticket_type_name: 'General', quantity: 2 }] }
@@ -14,7 +14,7 @@ const online: OfflineScanning = {
 }
 
 function gate(send: ScanSend, offline: OfflineScanning = online) {
-  return createGateScan({ eventId: 'ev1', pin: '1234', send, offline, timeoutMs: 5000 })
+  return createGateScan({ eventId: 'ev1', pin: '1234', send, offline })
 }
 
 describe('createGateScan: online', () => {
@@ -98,25 +98,25 @@ describe('createGateScan: Not checked', () => {
 
   it('shows the last live Door count, marked not updated', async () => {
     let up = true
-    const scanner = gate(async () => {
+    const gateScan = gate(async () => {
       if (!up) throw new TypeError('Failed to fetch')
       return { status: 200, body: { outcome: 'admitted', reservation: RES, doorCount: LIVE } }
     })
-    await scanner.scan('RES-AAAAAA')
+    await gateScan.scan('RES-AAAAAA')
     up = false
-    const r = await scanner.scan('RES-BBBBBB')
+    const r = await gateScan.scan('RES-BBBBBB')
     expect(r.doorCount).toEqual({ kind: 'stale', count: { ticketsAdmitted: 312, ticketsSold: 800 } })
   })
 
   it('does not take a wrong-PIN scan as the last Door count', async () => {
     let wire: unknown = { outcome: 'not_admitted', reservationId: 'RES-AAAAAA', reason: 'invalid_pin', doorCount: { status: 'withheld' } }
-    const scanner = gate(async () => {
+    const gateScan = gate(async () => {
       if (!wire) throw new TypeError('Failed to fetch')
       return { status: 200, body: wire }
     })
-    await scanner.scan('RES-AAAAAA')
+    await gateScan.scan('RES-AAAAAA')
     wire = null
-    expect((await scanner.scan('RES-AAAAAA')).doorCount).toEqual({ kind: 'unavailable' })
+    expect((await gateScan.scan('RES-AAAAAA')).doorCount).toEqual({ kind: 'unavailable' })
   })
 })
 
@@ -143,12 +143,20 @@ describe('createGateScan: offline mode', () => {
     expect(r.outcome).toMatchObject({ kind: 'already_scanned', admittedAt: '2026-12-01T13:40:00Z', offline: true })
   })
 
-  it('shows Not admitted in the same staff words as online', async () => {
-    const r = await gate(noNetwork, offline({ kind: 'denied', reservationId: 'RES-ZZZZZZ', reason: 'not_in_gate_list' })).scan('RES-ZZZZZZ')
-    expect(r.outcome).toEqual({
-      kind: 'not_admitted', reservationId: 'RES-ZZZZZZ', reason: 'not_in_gate_list',
-      message: 'Not in the gate list — send to the box office',
-    })
+  it.each([
+    ['not_in_gate_list', 'Not in the gate list — send to the box office'],
+    ['voided', 'This reservation has been voided'],
+    ['no_gate_list', 'No gate list on this phone'],
+    ['not_saved', "Couldn't save on this phone — write the ID down and admit manually"],
+  ] as const)('shows Not admitted (%s) in staff words', async (reason, message) => {
+    const r = await gate(noNetwork, offline({ kind: 'denied', reservationId: 'RES-ZZZZZZ', reason })).scan('RES-ZZZZZZ')
+    expect(r.outcome).toEqual({ kind: 'not_admitted', reservationId: 'RES-ZZZZZZ', reason, message })
+  })
+
+  it('uses the same words for a voided Reservation online and offline', async () => {
+    const online = await gate(answers({ outcome: 'not_admitted', reservationId: 'RES-AAAAAA', reason: 'voided', doorCount: LIVE })).scan('RES-AAAAAA')
+    const off = await gate(noNetwork, offline({ kind: 'denied', reservationId: 'RES-AAAAAA', reason: 'voided' })).scan('RES-AAAAAA')
+    expect(off.outcome).toEqual(online.outcome)
   })
 
   it('shows the Door count as unavailable with no Gate list', async () => {

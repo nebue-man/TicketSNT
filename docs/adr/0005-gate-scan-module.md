@@ -7,7 +7,7 @@ The meaning of a **Scan outcome** had spread across six places: the server's cod
 
 - `outcome.ts`: the Scan outcome (Admitted, Already scanned, Not admitted with a reason, **Not checked**), the staff-facing words for every Not admitted reason, and the wire shape with a strict parser.
 - The server half (`decideScan` in `src/lib/data/gate.ts`) turns a database answer into that shape.
-- The phone half (`scanner.ts`) turns any Scan, whether online, offline or unanswered, into one Scan outcome plus the Door count to show. The network and offline mode come in as adapters. GateScanner only draws the screen.
+- The phone half (`phone.ts`) turns any Scan, whether online, offline or unanswered, into one Scan outcome plus the Door count to show. The network and offline mode come in as adapters. GateScanner only draws the screen.
 
 ## Wire contract
 

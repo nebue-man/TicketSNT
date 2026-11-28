@@ -33,7 +33,7 @@ What the gate screen shows after a **Scan**: Admitted, Already scanned (a **Re-s
 _Avoid_: QR result, scan result
 
 **Not checked**:
-The **Scan outcome** when a **Scan** never reached the server and the **Gate phone** isn't in offline mode, so nothing was decided: the guest is neither admitted nor turned away.
+The **Scan outcome** when nothing was decided about a **Scan**: it never reached the server, or the server couldn't decide, and the **Gate phone** isn't in offline mode. The guest is neither admitted nor turned away.
 _Avoid_: Network error, failed scan
 
 **Gate phone**:

@@ -30,12 +30,11 @@ export interface GateScan {
 
 export const SCAN_TIMEOUT_MS = 5000
 
-export function createGateScan({ eventId, pin, send, offline, timeoutMs = SCAN_TIMEOUT_MS }: {
+export function createGateScan({ eventId, pin, send, offline }: {
   eventId: string
   pin: string
   send: ScanSend
   offline: OfflineScanning
-  timeoutMs?: number
 }): GateScan {
   let lastLive: GateDoorCount | null = null // shown, marked not updated, when a Scan is Not checked
 
@@ -52,7 +51,7 @@ export function createGateScan({ eventId, pin, send, offline, timeoutMs = SCAN_T
 
   async function scanOnline(reservationId: string): Promise<GateScanResult> {
     const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+    const timer = setTimeout(() => ctrl.abort(), SCAN_TIMEOUT_MS)
     let wire
     try {
       const res = await send({ reservationId, eventId, gatePin: pin }, ctrl.signal)

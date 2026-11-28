@@ -65,7 +65,7 @@ export async function scanReservation(
 }
 
 // The Scan is already recorded when the count is loaded: a slow count must not
-// push the answer past the phone's 5 s limit and show a false Not checked.
+// push the answer past the phone's SCAN_TIMEOUT_MS (gate-scan/phone.ts) and show a false Not checked.
 const DOOR_COUNT_TIMEOUT_MS = 1500
 
 async function loadDoorCount(eventId: string): Promise<WireDoorCount> {

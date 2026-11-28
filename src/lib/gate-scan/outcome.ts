@@ -55,7 +55,7 @@ export function notAdmitted(reservationId: string, reason: NotAdmittedReason): S
 
 // ── The wire: what /api/gate/scan-outcome answers, always with HTTP 200 ──────
 
-export type ServerNotAdmittedReason = 'invalid_pin' | 'not_found' | 'wrong_event' | 'voided'
+export type ServerNotAdmittedReason = Extract<NotAdmittedReason, 'invalid_pin' | 'not_found' | 'wrong_event' | 'voided'>
 
 export interface WireReservation {
   id: string

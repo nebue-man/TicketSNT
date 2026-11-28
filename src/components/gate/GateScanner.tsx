@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react'
-import { createGateScan, fetchScan } from '@/lib/gate-scan/scanner'
-import type { GateScanResult, ScanOutcome, ShownDoorCount } from '@/lib/gate-scan/outcome'
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react'
+import { createGateScan, fetchScan } from '@/lib/gate-scan/phone'
+import type { GateScanResult, ScanItem, ScanOutcome, ShownDoorCount } from '@/lib/gate-scan/outcome'
 import { createQrDecoder } from './qr-decoder'
 import { unlockAudio, cueRead, cueAdmitted, cueProblem } from './gate-feedback'
 import { useGateOffline } from './useGateOffline'
@@ -38,10 +38,10 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
   const offline = useGateOffline(eventId, pin)
   const offlineMode = offline.state.mode === 'offline'
   // One gate-scan module per page: it remembers the last live Door count between Scans.
-  const gateScan = useMemo(
-    () => createGateScan({ eventId, pin, send: fetchScan, offline: offline.scanning }),
-    [eventId, pin, offline.scanning],
-  )
+  // Created exactly once (a lazy useState, not useMemo, which React may discard),
+  // so the last live Door count survives between Scans. The offline adapter reads
+  // live state, so the first one stays correct.
+  const [gateScan] = useState(() => createGateScan({ eventId, pin, send: fetchScan, offline: offline.scanning }))
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const busyRef = useRef(false) // true while checking or showing a result: decoding is paused
@@ -261,7 +261,7 @@ function OutcomeScreen({ outcome, doorCount, onScanNext, onRetry, onGoOffline, g
 }) {
   let bg: string, fg: string, label: string, headline: string, sub: string
   let icon: 'tick' | 'repeat' | 'cross'
-  let items: { ticket_type_name: string; quantity: number }[] = []
+  let items: ScanItem[] = []
 
   if (outcome.kind === 'admitted' || outcome.kind === 'already_scanned') {
     items = outcome.items

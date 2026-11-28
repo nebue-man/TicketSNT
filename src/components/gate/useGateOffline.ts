@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { decideOfflineScan, offlineDoorCount, toGateList, type GateList, type OfflineScanOutcome } from '@/lib/gate-offline/gate-list'
-import type { OfflineScanning } from '@/lib/gate-scan/scanner'
+import type { OfflineScanning } from '@/lib/gate-scan/phone'
 import {
   readGateState, writeGateState, readGatePhone, saveGatePhoneName, gatePhoneLabel,
   EMPTY_GATE_STATE, type GateState, type GatePhone,
