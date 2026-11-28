@@ -11,6 +11,19 @@ export type DbResult<T, R extends string = never> =
   | { kind: 'refused'; code: R; detail: string | null }
   | { kind: 'failed' }
 
+/** A write: done, or why not. Routes turn the reason into a message and HTTP status. */
+export type DbWrite<R extends string = never> = { ok: true } | { ok: false; reason: R | 'failed' }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Whether an ID from a URL can name a row at all. The database rejects a
+ * malformed UUID with an error; that means "no such thing", not an outage.
+ */
+export function isUuid(id: string): boolean {
+  return UUID.test(id)
+}
+
 /** Thrown by a page read whose database call failed; the admin error screen catches it. */
 export class DbFailure extends Error {
   constructor(fn: string) {

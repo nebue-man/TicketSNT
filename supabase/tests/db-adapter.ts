@@ -7,6 +7,9 @@ import type { PGlite } from '@electric-sql/pglite'
 import type { DbAdapter } from '@/lib/data/db-adapter'
 
 const IDENT = /^[a-z_][a-z0-9_]*$/
+// PostgREST sends numeric as a JSON number; PGlite would give a string.
+const NUMERIC_OID = 1700
+const AS_JSON = { parsers: { [NUMERIC_OID]: (v: string) => Number(v) } }
 
 export function pgliteAdapter(getDb: () => PGlite): DbAdapter {
   return {
@@ -32,12 +35,12 @@ export function pgliteAdapter(getDb: () => PGlite): DbAdapter {
         if (!shape) {
           throw new Error(`function ${fn} does not exist`)
         } else if (shape.retset) {
-          data = (await db.query(`SELECT * FROM ${call}`, params)).rows
+          data = (await db.query(`SELECT * FROM ${call}`, params, AS_JSON)).rows
         } else if (shape.typname === 'void') {
           await db.query(`SELECT ${call}`, params)
           data = null
         } else {
-          data = (await db.query<{ v: unknown }>(`SELECT ${call} AS v`, params)).rows[0]?.v ?? null
+          data = (await db.query<{ v: unknown }>(`SELECT ${call} AS v`, params, AS_JSON)).rows[0]?.v ?? null
         }
         // Over HTTP, timestamps arrive as strings: match that.
         return { data: JSON.parse(JSON.stringify(data)), error: null }

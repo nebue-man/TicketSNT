@@ -1,7 +1,7 @@
-# ADR-0006: One database-call module, tested against the real SQL
+# ADR-0006 — One database-call module, tested against the real SQL
 
-**Date:** 2026-11-28
-**Status:** Accepted. Admin data modules moved (PR 1). The rest (`events`, `reservations`, `gate`, `gate-offline`, the reserve route) follow in PR 2. Supersedes the error-dialect part of ADR-0002.
+**Date:** 2026-11-28  
+**Status:** Accepted. Admin data modules moved (PR 1). The rest (`events`, `reservations`, `gate`, `gate-offline`, the reserve route) follow in PR 2. Supersedes the error-dialect part of ADR-0002, and settles ADR-0003's "consistent null-vs-throw contract" for the admin data modules.
 
 Every data module repeated the same steps: create the Supabase client, cast `rpc` to `any`, log the error its own way. They also reported failure six different ways: `null`, `[]`, `false`, `{ error }`, `{ ok, status }`, and parsed strings. As a result, a database outage showed on the dashboard as "No tiers yet" or an empty events list. None of the TypeScript data modules had tests.
 
@@ -22,7 +22,7 @@ Page reads throw `DbFailure` on *failed*, and `src/app/admin/error.tsx` shows "C
 `src/lib/data/db-adapter.ts` does only "run this function with these arguments". It has two adapters:
 
 - **Supabase** (`rpc`) in production.
-- **In-memory Postgres** (`supabase/tests/db-adapter.ts`, PGlite) in tests. It applies every migration and runs as `service_role`, so a missing permission grant fails in tests as it would on Supabase.
+- **In-memory Postgres** (`supabase/tests/db-adapter.ts`, PGlite) in tests. It applies every migration and runs as `service_role`, so a missing permission grant fails in tests as it would on Supabase. It returns `numeric` as a number, as PostgREST does.
 
 Tests replace the adapter module with `vi.mock`. Production code has no test-only hooks.
 
@@ -30,5 +30,6 @@ Tests replace the adapter module with `vi.mock`. Production code has no test-onl
 
 - Data modules are tested end to end: real SQL plus the TypeScript mapping, with no mocked database.
 - Each failure is logged once, naming the function.
-- `getReservationsForEvent` still uses the Supabase table query builder. It isn't a database function, so moving it needs a new SQL function (a migration). Left for later.
+- `getReservationsForEvent` still uses the Supabase table query builder. It isn't a database function, so moving it needs a new SQL function (a migration). It now throws `DbFailure` on an error too, but its tests wait for that move.
+- An ID from a URL that isn't a UUID means "no such event or tier" (`isUuid`), not a failure, because the database rejects it with an error.
 - Event and tier patch updates still read, then write, which isn't atomic (candidate #3).

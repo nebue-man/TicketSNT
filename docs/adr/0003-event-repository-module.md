@@ -16,6 +16,10 @@ The seam is currently **hypothetical** — one adapter (Supabase), no variation 
 
 If a third shape appears: deepen into a single `EventRepository` module with shared error semantics, a typed `EventNotFoundError`, and a consistent null-vs-throw contract.
 
+## Update (2026-11-28)
+
+ADR-0006 gives the admin data modules one error contract: page reads throw `DbFailure`, a missing row is `null`, writes return a reason. The event repository itself is still open (architecture review candidate #3).
+
 ## Trigger to revisit
 
 Task 3.1 (`getEventStats`) creates the third query shape. At that point, extract the repository.

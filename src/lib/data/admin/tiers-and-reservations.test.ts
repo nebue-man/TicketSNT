@@ -28,8 +28,28 @@ beforeEach(async () => {
 })
 
 describe('admin tiers', () => {
-  it('lists an event’s tiers in order', async () => {
-    expect((await tiers.getTiersForEvent(ids.eventId)).map(x => x.name)).toEqual(['General', 'VIP'])
+  it('lists an event’s tiers in order, with prices as numbers', async () => {
+    expect(await tiers.getTiersForEvent(ids.eventId)).toMatchObject([
+      { name: 'General', price: 5000, capacity: 10 },
+      { name: 'VIP', price: 15000, capacity: 10 },
+    ])
+  })
+
+  it('treats an ID that is not a UUID as nothing there, not a database failure', async () => {
+    expect(await tiers.getTiersForEvent('foo')).toEqual([])
+    expect(await reservations.getEventStats('foo')).toEqual([])
+    expect(await tiers.updateTier('foo', { capacity: 3 })).toEqual({ ok: false, reason: 'not_found' })
+    expect(await tiers.deleteTier('foo')).toEqual({ ok: false, reason: 'not_found' })
+  })
+
+  it.each([
+    ['createTier', 'admin_create_tier', () => tiers.createTier(ids.eventId, { name: 'B', price: 1, capacity: 1, sort_order: 3 })],
+    ['updateTier', 'admin_update_tier', () => tiers.updateTier(ids.generalId, { capacity: 20 })],
+    ['deleteTier', 'admin_delete_tier', () => tiers.deleteTier(ids.vipId)],
+    ['voidReservation', 'admin_void_reservation', () => reservations.voidReservation('RES-AAAAAA')],
+  ] as const)('%s answers failed when the database cannot run it', async (_name, fn, write) => {
+    await t.db.exec(`DROP FUNCTION ${fn}`)
+    expect(await write()).toEqual({ ok: false, reason: 'failed' })
   })
 
   it('adds a tier', async () => {
@@ -51,7 +71,7 @@ describe('admin tiers', () => {
     expect(await tiers.updateTier('00000000-0000-0000-0000-000000000000', { capacity: 3 })).toEqual({ ok: false, reason: 'not_found' })
   })
 
-  it('removes a tier with no bookings, and refuses one with bookings', async () => {
+  it('removes a tier with no Reservations, and refuses one that has them', async () => {
     await reserve('RES-AAAAAA', [ids.generalId, 1])
     expect(await tiers.deleteTier(ids.vipId)).toEqual({ ok: true })
     expect(await tiers.deleteTier(ids.generalId)).toEqual({ ok: false, reason: 'has_bookings' })

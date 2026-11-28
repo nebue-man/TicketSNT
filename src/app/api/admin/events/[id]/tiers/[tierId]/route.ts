@@ -26,6 +26,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { tierId } = await params
   const result = await deleteTier(tierId)
   if (result.ok) return NextResponse.json({ ok: true })
+  if (result.reason === 'not_found') return NextResponse.json({ error: 'Tier not found' }, { status: 404 })
   if (result.reason === 'has_bookings') return NextResponse.json({ error: 'Cannot remove a tier with existing bookings' }, { status: 409 })
   return NextResponse.json({ error: 'Delete failed. Please try again.' }, { status: 500 })
 }

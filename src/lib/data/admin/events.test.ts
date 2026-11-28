@@ -88,8 +88,22 @@ describe('admin events', () => {
     await expect(events.getAllEvents()).rejects.toBeInstanceOf(DbFailure)
   })
 
-  it('answers failed for a write the database could not run', async () => {
-    await t.db.exec('DROP FUNCTION admin_close_event(uuid)')
-    expect(await events.closeEvent(NOBODY)).toEqual({ ok: false, reason: 'failed' })
+  it.each([
+    ['createEvent', 'admin_create_event', () => events.createEvent(NEW_EVENT)],
+    ['updateEvent', 'admin_update_event', async () => events.updateEvent((await seedEvent(t.db)).eventId, { venue: 'X' })],
+    ['closeEvent', 'admin_close_event', async () => events.closeEvent((await seedEvent(t.db)).eventId)],
+    ['deleteEvent', 'admin_delete_event', async () => events.deleteEvent((await seedEvent(t.db)).eventId)],
+    ['archiveEvent', 'admin_archive_event', async () => events.archiveEvent((await seedEvent(t.db)).eventId)],
+    ['restoreEvent', 'admin_restore_event', async () => events.restoreEvent((await seedEvent(t.db)).eventId)],
+  ] as const)('%s answers failed when the database cannot run it', async (_name, fn, write) => {
+    await t.db.exec(`DROP FUNCTION ${fn}`)
+    expect(await write()).toEqual({ ok: false, reason: 'failed' })
+  })
+
+  it('treats an event ID that is not a UUID as no such event, not a database failure', async () => {
+    expect(await events.getAdminEvent('foo')).toBeNull()
+    expect(await events.updateEvent('foo', { venue: 'X' })).toEqual({ ok: false, reason: 'not_found' })
+    expect(await events.deleteEvent('foo')).toEqual({ ok: false, reason: 'not_found' })
+    expect(await events.closeEvent('foo')).toEqual({ ok: false, reason: 'not_found' })
   })
 })

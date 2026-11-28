@@ -1,11 +1,9 @@
-import { callDb, DbFailure } from '@/lib/data/db'
+import { callDb, DbFailure, isUuid, type DbWrite } from '@/lib/data/db'
 import type { TicketType } from '@/types/database'
-
-/** A write to a tier: done, or why not. Routes turn the reason into a message and status. */
-export type TierWrite<R extends string = never> = { ok: true } | { ok: false; reason: R | 'failed' }
 
 /** An event's tiers in display order. Throws DbFailure if the database can't answer. */
 export async function getTiersForEvent(eventId: string): Promise<TicketType[]> {
+  if (!isUuid(eventId)) return []
   const r = await callDb<TicketType[]>('admin_get_tiers', { p_event_id: eventId })
   if (r.kind !== 'ok') throw new DbFailure('admin_get_tiers')
   return r.data ?? []
@@ -13,7 +11,7 @@ export async function getTiersForEvent(eventId: string): Promise<TicketType[]> {
 
 export async function createTier(eventId: string, tier: {
   name: string; price: number; capacity: number; sort_order: number
-}): Promise<TierWrite> {
+}): Promise<DbWrite> {
   const r = await callDb('admin_create_tier', {
     p_event_id:   eventId,
     p_name:       tier.name,
@@ -27,7 +25,8 @@ export async function createTier(eventId: string, tier: {
 /** Changes only the fields in `patch`. Not atomic: reads the tier, then writes it back (candidate #3). */
 export async function updateTier(id: string, patch: {
   name?: string; price?: number; capacity?: number
-}): Promise<TierWrite<'not_found'> | { ok: false; reason: 'capacity_too_low'; sold: number }> {
+}): Promise<DbWrite<'not_found'> | { ok: false; reason: 'capacity_too_low'; sold: number }> {
+  if (!isUuid(id)) return { ok: false, reason: 'not_found' }
   const read = await callDb<TicketType[]>('admin_get_tier', { p_id: id })
   if (read.kind !== 'ok') return { ok: false, reason: 'failed' }
   const current = read.data?.[0]
@@ -44,12 +43,18 @@ export async function updateTier(id: string, patch: {
   if (typeof r.data === 'string' && r.data.startsWith('capacity_too_low:')) {
     return { ok: false, reason: 'capacity_too_low', sold: Number(r.data.split(':')[1]) || 0 }
   }
-  return { ok: true }
+  if (r.data === 'ok') return { ok: true }
+  console.error('[admin_update_tier] unexpected answer:', r.data)
+  return { ok: false, reason: 'failed' }
 }
 
-export async function deleteTier(id: string): Promise<TierWrite<'has_bookings'>> {
+/** Removes a tier. Refused once any Reservation includes it (the database calls this 'has_bookings'). */
+export async function deleteTier(id: string): Promise<DbWrite<'not_found' | 'has_bookings'>> {
+  if (!isUuid(id)) return { ok: false, reason: 'not_found' }
   const r = await callDb<string | null>('admin_delete_tier', { p_id: id })
   if (r.kind !== 'ok') return { ok: false, reason: 'failed' }
   if (r.data === 'has_bookings') return { ok: false, reason: 'has_bookings' }
-  return { ok: true }
+  if (r.data === 'ok') return { ok: true }
+  console.error('[admin_delete_tier] unexpected answer:', r.data)
+  return { ok: false, reason: 'failed' }
 }

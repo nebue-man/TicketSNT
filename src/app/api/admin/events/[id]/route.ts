@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { updateEvent, closeEvent, deleteEvent, archiveEvent, restoreEvent } from '@/lib/data/admin/events'
-import type { EventInsert, EventWrite } from '@/lib/data/admin/events'
+import type { EventInsert } from '@/lib/data/admin/events'
+import type { DbWrite } from '@/lib/data/db'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await requireAuth('admin')
@@ -23,18 +24,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return eventResponse(await updateEvent(id, patch))
 }
 
-type EventRefusal = 'not_found' | 'has_reservations' | 'not_archived' | 'failed'
+type EventWriteReason = 'not_found' | 'has_reservations' | 'not_archived' | 'failed'
 
-const REFUSALS: Record<EventRefusal, [string, number]> = {
+const REASON_RESPONSES: Record<EventWriteReason, [string, number]> = {
   not_found:        ['Event not found', 404],
   has_reservations: ['This event has reservations, so it can’t be deleted. Archive it instead.', 409],
   not_archived:     ['This event isn’t archived.', 409],
   failed:           ['Something went wrong. Please try again.', 500],
 }
 
-function eventResponse(result: EventWrite<EventRefusal>) {
+function eventResponse(result: DbWrite<EventWriteReason>) {
   if (result.ok) return NextResponse.json({ ok: true })
-  const [error, status] = REFUSALS[result.reason]
+  const [error, status] = REASON_RESPONSES[result.reason]
   return NextResponse.json({ error }, { status })
 }
 

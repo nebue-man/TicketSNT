@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { callDb, DbFailure } from '@/lib/data/db'
+import { callDb, DbFailure, isUuid, type DbWrite } from '@/lib/data/db'
 import type { Reservation } from '@/types/database'
 
 
@@ -14,6 +14,7 @@ export interface TierStat {
 
 /** Tickets sold and remaining per tier. Throws DbFailure if the database can't answer. */
 export async function getEventStats(eventId: string): Promise<TierStat[]> {
+  if (!isUuid(eventId)) return []
   const r = await callDb<{ id: string; name: string; price: number; capacity: number; sold: number }[]>(
     'admin_get_tiers', { p_event_id: eventId })
   if (r.kind !== 'ok') throw new DbFailure('admin_get_tiers')
@@ -26,6 +27,7 @@ export async function getReservationsForEvent(
   eventId: string,
   search?: string
 ): Promise<(Reservation & { items: { ticket_type_name: string; quantity: number }[] })[]> {
+  if (!isUuid(eventId)) return []
   const supabase = createAdminClient()
 
   let query = supabase
@@ -46,7 +48,11 @@ export async function getReservationsForEvent(
   }
 
   const { data, error } = await query
-  if (error || !data) return []
+  if (error) {
+    console.error('[db] reservations query failed:', error.message)
+    throw new DbFailure('reservations query')
+  }
+  if (!data) return []
 
   return (data as Record<string, unknown>[]).map(r => {
     const rawItems = r.reservation_items as { quantity: number; ticket_types: { name: string } | null }[] | null
@@ -58,7 +64,7 @@ export async function getReservationsForEvent(
   })
 }
 
-export async function voidReservation(id: string): Promise<{ ok: true } | { ok: false; reason: 'failed' }> {
+export async function voidReservation(id: string): Promise<DbWrite> {
   const r = await callDb('admin_void_reservation', { p_id: id })
   return r.kind === 'ok' ? { ok: true } : { ok: false, reason: 'failed' }
 }

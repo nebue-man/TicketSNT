@@ -1,4 +1,4 @@
-import { callDb, DbFailure } from '@/lib/data/db'
+import { callDb, DbFailure, isUuid, type DbWrite } from '@/lib/data/db'
 import type { Event, EventStatus } from '@/types/database'
 
 export type EventInsert = {
@@ -12,9 +12,6 @@ export type EventInsert = {
   status: EventStatus
 }
 
-/** A write to an event: done, or why not. Routes turn the reason into a message and status. */
-export type EventWrite<R extends string = never> = { ok: true } | { ok: false; reason: R | 'failed' }
-
 /** Every event for the admin list. Throws DbFailure if the database can't answer. */
 export async function getAllEvents(): Promise<Event[]> {
   const r = await callDb<Event[]>('admin_get_all_events')
@@ -24,6 +21,7 @@ export async function getAllEvents(): Promise<Event[]> {
 
 /** One event, or null if there is no such event. Throws DbFailure if the database can't answer. */
 export async function getAdminEvent(id: string): Promise<Event | null> {
+  if (!isUuid(id)) return null
   const r = await callDb<Event[]>('admin_get_event', { p_id: id })
   if (r.kind !== 'ok') throw new DbFailure('admin_get_event')
   return r.data?.[0] ?? null
@@ -44,7 +42,8 @@ export async function createEvent(insert: EventInsert): Promise<{ ok: true; id: 
 }
 
 /** Changes only the fields in `patch`. Not atomic: reads the event, then writes it back (candidate #3). */
-export async function updateEvent(id: string, patch: Partial<EventInsert>): Promise<EventWrite<'not_found'>> {
+export async function updateEvent(id: string, patch: Partial<EventInsert>): Promise<DbWrite<'not_found'>> {
+  if (!isUuid(id)) return { ok: false, reason: 'not_found' }
   const read = await callDb<Event[]>('admin_get_event', { p_id: id })
   if (read.kind !== 'ok') return { ok: false, reason: 'failed' }
   const current = read.data?.[0]
@@ -63,13 +62,15 @@ export async function updateEvent(id: string, patch: Partial<EventInsert>): Prom
   return r.kind === 'ok' ? { ok: true } : { ok: false, reason: 'failed' }
 }
 
-export async function closeEvent(id: string): Promise<EventWrite> {
+export async function closeEvent(id: string): Promise<DbWrite<'not_found'>> {
+  if (!isUuid(id)) return { ok: false, reason: 'not_found' }
   const r = await callDb('admin_close_event', { p_id: id })
   return r.kind === 'ok' ? { ok: true } : { ok: false, reason: 'failed' }
 }
 
 /** The lifecycle functions answer 'ok' or a reason (migration 0011). */
-async function lifecycle<R extends string>(fn: string, id: string, reasons: readonly R[]): Promise<EventWrite<R>> {
+async function lifecycle<R extends string>(fn: string, id: string, reasons: readonly (R | 'not_found')[]): Promise<DbWrite<R | 'not_found'>> {
+  if (!isUuid(id)) return { ok: false, reason: 'not_found' }
   const r = await callDb<string>(fn, { p_id: id })
   if (r.kind !== 'ok') return { ok: false, reason: 'failed' }
   if (r.data === 'ok') return { ok: true }
