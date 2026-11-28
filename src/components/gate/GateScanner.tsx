@@ -21,8 +21,8 @@ type ShownDoorCount =
   | { kind: 'live'; count: GateDoorCount }    // sent with this Scan's response
   | { kind: 'stale'; count: GateDoorCount }   // last one received; this Scan didn't reach the server
   | { kind: 'offline'; count: GateDoorCount } // approximate, from this phone's Gate list
-  | { kind: 'unavailable' }
-  | { kind: 'hidden' }                        // wrong PIN: no event numbers
+  | { kind: 'unavailable' }                   // count failed, or the PIN couldn't be checked
+  | { kind: 'hidden' }                        // wrong PIN: no section at all
 
 type View =
   | { phase: 'scan' }

@@ -49,7 +49,7 @@ An **Offline scan** that admitted a **Reservation** which another **Gate phone**
 _Avoid_: Conflict, duplicate
 
 **Door count**:
-The number of guests admitted so far for an event, counting every ticket in each admitted **Reservation**. A **Gate phone** in offline mode shows only an approximate Door count: what its **Gate list** knew plus its own **Offline scans**, so it misses other phones' offline admissions.
+The number of guests admitted so far for an event, counting every ticket in each admitted **Reservation**. A **Gate phone** in offline mode shows only an approximate Door count: what its **Gate list** knew plus its own **Offline scans**, so it misses other Gate phones' **Offline scans**.
 _Avoid_: Attendance, check-in count
 
 ### Event lifecycle

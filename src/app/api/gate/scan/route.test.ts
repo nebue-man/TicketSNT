@@ -53,11 +53,34 @@ describe('POST /api/gate/scan — Door count', () => {
     expect(getDoorCount).not.toHaveBeenCalled()
   })
 
-  it('never returns the Door count when the PIN could not be checked', async () => {
+  it('shows the Door count as unavailable, never the numbers, when the PIN could not be checked', async () => {
     scanReservation.mockResolvedValue({ ok: false, error: 'unknown' })
     const { body } = await scan()
-    expect(body).toEqual({ error: 'unknown' })
+    expect(body).toEqual({ error: 'unknown', doorCount: null })
     expect(getDoorCount).not.toHaveBeenCalled()
+  })
+
+  it('still admits when loading the Door count throws', async () => {
+    scanReservation.mockResolvedValue({ ok: true, reservation: RESERVATION, alreadyScanned: false })
+    getDoorCount.mockRejectedValue(new Error('connection reset'))
+    const { status, body } = await scan()
+    expect(status).toBe(200)
+    expect(body).toMatchObject({ ok: true, doorCount: null })
+  })
+
+  it('does not hold up the Scan outcome for a slow Door count', async () => {
+    vi.useFakeTimers()
+    try {
+      scanReservation.mockResolvedValue({ ok: true, reservation: RESERVATION, alreadyScanned: false })
+      getDoorCount.mockReturnValue(new Promise(() => {})) // never answers
+      const pending = scan()
+      await vi.advanceTimersByTimeAsync(1500)
+      const { status, body } = await pending
+      expect(status).toBe(200)
+      expect(body).toMatchObject({ ok: true, doorCount: null })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('still admits when the Door count cannot be loaded', async () => {
