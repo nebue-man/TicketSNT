@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { callDb } from '@/lib/data/db'
 
 /** Door count for one event (GLOSSARY.md): every ticket in an admitted Reservation counts. */
 export interface DoorCount {
@@ -31,12 +31,6 @@ export function toDoorCount(raw: unknown): DoorCount {
 
 /** Returns null if the count couldn't be loaded (shown as "unavailable", never as 0). */
 export async function getDoorCount(eventId: string): Promise<DoorCount | null> {
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc('admin_get_door_count', { p_event_id: eventId })
-  if (error) {
-    console.error('[getDoorCount] rpc error:', JSON.stringify(error))
-    return null
-  }
-  return toDoorCount(data)
+  const r = await callDb('admin_get_door_count', { p_event_id: eventId })
+  return r.kind === 'ok' ? toDoorCount(r.data) : null
 }

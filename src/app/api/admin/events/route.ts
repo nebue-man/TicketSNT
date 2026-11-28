@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await createEvent({ name, date_time, venue, description, cover_image_url, max_per_reservation, gate_pin, status })
-  if ('error' in result) return NextResponse.json({ error: result.error }, { status: 500 })
+  if (!result.ok) return NextResponse.json({ error: 'Failed to create event. Please try again.' }, { status: 500 })
 
   return NextResponse.json({ id: result.id }, { status: 201 })
 }
