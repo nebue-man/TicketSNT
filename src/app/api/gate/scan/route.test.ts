@@ -14,7 +14,7 @@ const { POST } = await import('./route')
 const COUNT: DoorCount = {
   ticketsSold: 800, ticketsAdmitted: 312, ticketsAdmittedGate: 290, ticketsAdmittedBoxOffice: 22, reservationsAdmitted: 120,
 }
-const RESERVATION = { id: 'RES-AAAAAA', buyer_name: 'Amal', buyer_email: '', buyer_phone: '', items: [] }
+const RESERVATION = { id: 'RES-AAAAAA', buyer_name: 'Amal', items: [] }
 
 async function scan() {
   const res = await POST(new NextRequest('https://tickets.test/api/gate/scan', {

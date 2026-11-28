@@ -11,11 +11,10 @@ export interface GateDoorCount {
   ticketsSold: number
 }
 
+/** What a Gate phone may know about a scanned Reservation: no email or phone (ADR-0004). */
 export interface ScannedReservation {
   id: string
   buyer_name: string
-  buyer_email: string
-  buyer_phone: string
   items: { ticket_type_name: string; quantity: number }[]
 }
 
@@ -26,8 +25,6 @@ interface ScanPayload {
   code: ScanCode
   reservation_id?: string
   buyer_name?: string
-  buyer_email?: string
-  buyer_phone?: string
   items?: { ticket_type_name: string; quantity: number }[]
   scanned_at?: string
 }
@@ -56,11 +53,9 @@ export async function scanReservation(
 
   if (data.code === 'admitted' || data.code === 'already_scanned') {
     const reservation: ScannedReservation = {
-      id:          data.reservation_id!,
-      buyer_name:  data.buyer_name!,
-      buyer_email: data.buyer_email!,
-      buyer_phone: data.buyer_phone!,
-      items:       data.items ?? [],
+      id:         data.reservation_id!,
+      buyer_name: data.buyer_name!,
+      items:      data.items ?? [],
     }
     if (data.code === 'already_scanned') {
       return { ok: true, reservation, alreadyScanned: true, scannedAt: data.scanned_at! }
