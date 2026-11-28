@@ -1,13 +1,12 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { callDb, DbFailure, isUuid } from '@/lib/data/db'
 import type { Event, TicketType } from '@/types/database'
 
-export async function getEventForGate(eventId: string): Promise<Event | null> {
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc('admin_get_event', { p_id: eventId })
-  if (error) console.error('[getEventForGate] rpc error:', JSON.stringify(error))
-  const rows = data as Event[] | null
-  return rows?.[0] ?? null
+/** One event, or null if there is no such event. Throws DbFailure if the database can't answer. */
+export async function getEvent(eventId: string): Promise<Event | null> {
+  if (!isUuid(eventId)) return null
+  const r = await callDb<Event[]>('admin_get_event', { p_id: eventId })
+  if (r.kind !== 'ok') throw new DbFailure('admin_get_event')
+  return r.data?.[0] ?? null
 }
 
 export interface EventWithTicketTypes {
@@ -15,29 +14,21 @@ export interface EventWithTicketTypes {
   ticketTypes: TicketType[]
 }
 
-export async function getEventWithTicketTypes(
-  eventId: string
-): Promise<EventWithTicketTypes | null> {
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const s = supabase as any
-  const [eventResult, tiersResult] = await Promise.all([
-    s.rpc('admin_get_event', { p_id: eventId }),
-    s.rpc('admin_get_tiers', { p_event_id: eventId }),
+/** An event and its ticket types, or null if there is no such event. Throws DbFailure if the database can't answer. */
+export async function getEventWithTicketTypes(eventId: string): Promise<EventWithTicketTypes | null> {
+  if (!isUuid(eventId)) return null
+  const [event, tiers] = await Promise.all([
+    getEvent(eventId),
+    callDb<TicketType[]>('admin_get_tiers', { p_event_id: eventId }),
   ])
-  if (eventResult.error) console.error('[getEventWithTicketTypes] event error:', JSON.stringify(eventResult.error))
-  if (tiersResult.error) console.error('[getEventWithTicketTypes] tiers error:', JSON.stringify(tiersResult.error))
-  const event = (eventResult.data as Event[] | null)?.[0]
+  if (tiers.kind !== 'ok') throw new DbFailure('admin_get_tiers')
   if (!event) return null
-  const ticketTypes = (tiersResult.data as TicketType[] | null) ?? []
-  return { event, ticketTypes }
+  return { event, ticketTypes: tiers.data ?? [] }
 }
 
+/** Draft and published events; closed and archived events are not bookable. Throws DbFailure if the database can't answer. */
 export async function getUpcomingEvents(): Promise<Event[]> {
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc('admin_get_all_events')
-  if (error) console.error('[getUpcomingEvents] rpc error:', JSON.stringify(error))
-  // Filter to draft/published only — closed and archived events are not bookable
-  return ((data as Event[] | null) ?? []).filter(e => e.status === 'published' || e.status === 'draft')
+  const r = await callDb<Event[]>('admin_get_all_events')
+  if (r.kind !== 'ok') throw new DbFailure('admin_get_all_events')
+  return (r.data ?? []).filter(e => e.status === 'published' || e.status === 'draft')
 }

@@ -1,7 +1,7 @@
 # ADR-0006 — One database-call module, tested against the real SQL
 
 **Date:** 2026-11-28  
-**Status:** Accepted. Admin data modules moved (PR 1). The rest (`events`, `reservations`, `gate`, `gate-offline`, the reserve route) follow in PR 2. Supersedes the error-dialect part of ADR-0002, and settles ADR-0003's "consistent null-vs-throw contract" for the admin data modules.
+**Status:** Accepted. Admin data modules moved (PR 1); `events`, `reservations`, `gate`, `gate-offline` and the reserve route moved (PR 2). Supersedes the error-dialect part of ADR-0002, and settles ADR-0003's "consistent null-vs-throw contract" for the admin data modules.
 
 Every data module repeated the same steps: create the Supabase client, cast `rpc` to `any`, log the error its own way. They also reported failure six different ways: `null`, `[]`, `false`, `{ error }`, `{ ok, status }`, and parsed strings. As a result, a database outage showed on the dashboard as "No tiers yet" or an empty events list. None of the TypeScript data modules had tests.
 
@@ -16,6 +16,8 @@ Every data module repeated the same steps: create the Supabase client, cast `rpc
 **Only raised errors can be refusals.** A returned value is the function's answer. A raised error is ambiguous between "refused" and "broken", so the caller must say which codes it expects, and any code it didn't list counts as *failed*. This leaves the existing SQL alone: making every function signal refusals the same way would need migrations run by hand.
 
 Page reads throw `DbFailure` on *failed*, and `src/app/admin/error.tsx` shows "Couldn't reach the database" with Try again. Writes return `{ ok: true } | { ok: false, reason }`. Routes, not data modules, turn a reason into a message and an HTTP status. The Door count is the exception: it stays `null` on failure, because the dashboard and the gate show it as "unavailable" and keep working.
+
+Outside admin, `src/app/error.tsx` shows "Something went wrong. Please try again in a moment" for a failed counter or gate page read. The reserve API answers **503** with that message when a database call fails; a refusal keeps its own answer (409 `capacity_exceeded`). The gate keeps its own contracts: a failed Scan is *Not checked* (`decideScan` answers null), and the Gate list, the offline-scan upload and the offline scan issues answer `unknown` / `null` as before.
 
 ## The seam
 

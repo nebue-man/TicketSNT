@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateReservationInput } from '@/lib/utils/validate-reservation'
 import { validateDoorSale } from '@/lib/utils/validate-door-sale'
 import { createReservation } from '@/lib/data/reservations'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getEvent } from '@/lib/data/events'
+import { DbFailure } from '@/lib/data/db'
 import type { Event } from '@/types/database'
+
+// ADR-0006: a failed database call is an outage, not a refusal; the buyer can try again.
+const UNAVAILABLE = { error: 'Something went wrong. Please try again in a moment.' }
 
 export async function POST(request: NextRequest) {
   let body: unknown
@@ -18,16 +22,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'eventId is required' }, { status: 400 })
   }
 
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: eventRows, error: eventError } = await (supabase as any).rpc('admin_get_event', { p_id: eventId })
-
-  if (eventError) {
-    console.error('Event fetch error:', eventError)
-    return NextResponse.json({ error: 'Failed to load event' }, { status: 500 })
+  let event: Event | null
+  try {
+    event = await getEvent(eventId)
+  } catch (err) {
+    if (err instanceof DbFailure) return NextResponse.json(UNAVAILABLE, { status: 503 })
+    throw err
   }
-
-  const event = ((eventRows as Event[] | null)?.[0]) ?? null
 
   if (!event) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 })
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
   const result = await createReservation(eventId, validation.data, doorSale.doorSale)
 
   if (!result.ok) {
+    if (result.error === 'failed') return NextResponse.json(UNAVAILABLE, { status: 503 })
     const status = result.error === 'capacity_exceeded' ? 409 : 400
     return NextResponse.json({ error: result.error }, { status })
   }

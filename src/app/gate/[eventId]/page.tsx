@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import QRCode from 'react-qr-code'
-import { getEventForGate } from '@/lib/data/events'
+import { getEvent } from '@/lib/data/events'
 import { GateScanner } from '@/components/gate/GateScanner'
 import { GateSignOut } from '@/components/gate/GateSignOut'
 import { requireAuth } from '@/lib/auth'
@@ -16,7 +16,7 @@ export default async function GatePage({ params, searchParams }: Props) {
   const { eventId } = await params
   const { pin } = await searchParams
 
-  const event = await getEventForGate(eventId)
+  const event = await getEvent(eventId)
   if (!event || event.status === 'archived') notFound()
 
   const eventDate = new Date(event.date_time)
