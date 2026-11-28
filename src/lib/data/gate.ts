@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { callDb } from '@/lib/data/db'
 import { getDoorCount } from '@/lib/data/admin/door-count'
 import type { ScanWire, WireDoorCount } from '@/lib/gate-scan/outcome'
 
@@ -39,15 +39,9 @@ export async function scanReservation(
   eventId: string,
   gatePin: string
 ): Promise<ScanResult> {
-  const supabase = createAdminClient()
-
-  type RpcCall = (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: ScanPayload | null; error: unknown }>
-  const { data, error } = await (supabase.rpc as unknown as RpcCall)(
-    'scan_reservation',
-    { p_reservation_id: reservationId, p_event_id: eventId, p_gate_pin: gatePin }
-  )
-
-  if (error || !data) return { ok: false, error: 'unknown' }
+  const r = await callDb<ScanPayload | null>('scan_reservation', { p_reservation_id: reservationId, p_event_id: eventId, p_gate_pin: gatePin })
+  if (r.kind !== 'ok' || !r.data) return { ok: false, error: 'unknown' }
+  const data = r.data
 
   if (data.code === 'admitted' || data.code === 'already_scanned') {
     const reservation: ScannedReservation = {
