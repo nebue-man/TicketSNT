@@ -1,7 +1,7 @@
 # ADR-0002 — Typed ReservationOutcome at the data-layer seam
 
 **Date:** 2026-11-19  
-**Status:** Proposed  
+**Status:** Partly superseded by ADR-0006 (error dialect, 2026-11-28). The typed ReservationOutcome remains open (architecture review candidate #4).  
 **Strength:** Worth exploring
 
 ## Context

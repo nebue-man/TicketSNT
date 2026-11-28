@@ -16,8 +16,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'name, price, capacity are required' }, { status: 422 })
   }
 
-  const ok = await createTier(eventId, { name, price, capacity, sort_order })
-  if (!ok) return NextResponse.json({ error: 'Failed to create tier' }, { status: 500 })
+  const result = await createTier(eventId, { name, price, capacity, sort_order })
+  if (!result.ok) return NextResponse.json({ error: 'Failed to create tier' }, { status: 500 })
 
   return NextResponse.json({ ok: true }, { status: 201 })
 }

@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { callDb, DbFailure } from '@/lib/data/db'
 import type { Reservation } from '@/types/database'
 
 
@@ -11,15 +12,16 @@ export interface TierStat {
   remaining: number
 }
 
+/** Tickets sold and remaining per tier. Throws DbFailure if the database can't answer. */
 export async function getEventStats(eventId: string): Promise<TierStat[]> {
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc('admin_get_tiers', { p_event_id: eventId })
-  if (error) console.error('[getEventStats] rpc error:', JSON.stringify(error))
-  return ((data as { id: string; name: string; price: number; capacity: number; sold: number }[] | null) ?? [])
-    .map(t => ({ ...t, remaining: t.capacity - t.sold }))
+  const r = await callDb<{ id: string; name: string; price: number; capacity: number; sold: number }[]>(
+    'admin_get_tiers', { p_event_id: eventId })
+  if (r.kind !== 'ok') throw new DbFailure('admin_get_tiers')
+  return (r.data ?? []).map(t => ({ ...t, remaining: t.capacity - t.sold }))
 }
 
+// A table query, not a database function, so callDb can't cover it without new
+// SQL (a migration). Left on the query builder for now (ADR-0006).
 export async function getReservationsForEvent(
   eventId: string,
   search?: string
@@ -56,10 +58,7 @@ export async function getReservationsForEvent(
   })
 }
 
-export async function voidReservation(id: string): Promise<boolean> {
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any).rpc('admin_void_reservation', { p_id: id })
-  if (error) console.error('[voidReservation] rpc error:', error)
-  return !error
+export async function voidReservation(id: string): Promise<{ ok: true } | { ok: false; reason: 'failed' }> {
+  const r = await callDb('admin_void_reservation', { p_id: id })
+  return r.kind === 'ok' ? { ok: true } : { ok: false, reason: 'failed' }
 }

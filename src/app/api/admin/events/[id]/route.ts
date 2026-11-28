@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { updateEvent, closeEvent, deleteEvent, archiveEvent, restoreEvent } from '@/lib/data/admin/events'
-import type { EventInsert, EventLifecycleResult } from '@/lib/data/admin/events'
+import type { EventInsert, EventWrite } from '@/lib/data/admin/events'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await requireAuth('admin')
@@ -20,32 +20,36 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (typeof body.gate_pin === 'string' && body.gate_pin.trim()) patch.gate_pin = body.gate_pin.trim().toUpperCase()
   if (body.status === 'published' || body.status === 'draft') patch.status = body.status
 
-  const ok = await updateEvent(id, patch)
-  if (!ok) return NextResponse.json({ error: 'Update failed' }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  return eventResponse(await updateEvent(id, patch))
 }
 
-function lifecycleResponse(result: EventLifecycleResult) {
+type EventRefusal = 'not_found' | 'has_reservations' | 'not_archived' | 'failed'
+
+const REFUSALS: Record<EventRefusal, [string, number]> = {
+  not_found:        ['Event not found', 404],
+  has_reservations: ['This event has reservations, so it can’t be deleted. Archive it instead.', 409],
+  not_archived:     ['This event isn’t archived.', 409],
+  failed:           ['Something went wrong. Please try again.', 500],
+}
+
+function eventResponse(result: EventWrite<EventRefusal>) {
   if (result.ok) return NextResponse.json({ ok: true })
-  return NextResponse.json({ error: result.error }, { status: result.status })
+  const [error, status] = REFUSALS[result.reason]
+  return NextResponse.json({ error }, { status })
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await requireAuth('admin')
   const { id } = await params
   const body = await req.json() as { action?: string }
-  if (body.action === 'close') {
-    const ok = await closeEvent(id)
-    if (!ok) return NextResponse.json({ error: 'Failed to close event' }, { status: 500 })
-    return NextResponse.json({ ok: true })
-  }
-  if (body.action === 'archive') return lifecycleResponse(await archiveEvent(id))
-  if (body.action === 'restore') return lifecycleResponse(await restoreEvent(id))
+  if (body.action === 'close') return eventResponse(await closeEvent(id))
+  if (body.action === 'archive') return eventResponse(await archiveEvent(id))
+  if (body.action === 'restore') return eventResponse(await restoreEvent(id))
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await requireAuth('admin')
   const { id } = await params
-  return lifecycleResponse(await deleteEvent(id))
+  return eventResponse(await deleteEvent(id))
 }

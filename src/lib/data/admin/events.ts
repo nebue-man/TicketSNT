@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { callDb, DbFailure } from '@/lib/data/db'
 import type { Event, EventStatus } from '@/types/database'
 
 export type EventInsert = {
@@ -12,27 +12,25 @@ export type EventInsert = {
   status: EventStatus
 }
 
+/** A write to an event: done, or why not. Routes turn the reason into a message and status. */
+export type EventWrite<R extends string = never> = { ok: true } | { ok: false; reason: R | 'failed' }
+
+/** Every event for the admin list. Throws DbFailure if the database can't answer. */
 export async function getAllEvents(): Promise<Event[]> {
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc('admin_get_all_events')
-  if (error) console.error('[getAllEvents] rpc error:', JSON.stringify(error))
-  return (data as Event[] | null) ?? []
+  const r = await callDb<Event[]>('admin_get_all_events')
+  if (r.kind !== 'ok') throw new DbFailure('admin_get_all_events')
+  return r.data ?? []
 }
 
+/** One event, or null if there is no such event. Throws DbFailure if the database can't answer. */
 export async function getAdminEvent(id: string): Promise<Event | null> {
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc('admin_get_event', { p_id: id })
-  if (error) console.error('[getAdminEvent] id:', id, 'rpc error:', JSON.stringify(error))
-  const rows = data as Event[] | null
-  return rows?.[0] ?? null
+  const r = await callDb<Event[]>('admin_get_event', { p_id: id })
+  if (r.kind !== 'ok') throw new DbFailure('admin_get_event')
+  return r.data?.[0] ?? null
 }
 
-export async function createEvent(insert: EventInsert): Promise<{ id: string } | { error: string }> {
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc('admin_create_event', {
+export async function createEvent(insert: EventInsert): Promise<{ ok: true; id: string } | { ok: false; reason: 'failed' }> {
+  const r = await callDb<string>('admin_create_event', {
     p_name:                insert.name,
     p_date_time:           insert.date_time,
     p_venue:               insert.venue,
@@ -42,78 +40,55 @@ export async function createEvent(insert: EventInsert): Promise<{ id: string } |
     p_gate_pin:            insert.gate_pin,
     p_status:              insert.status,
   })
-  console.log('[createEvent] rpc result — data:', JSON.stringify(data), 'error:', JSON.stringify(error))
-  if (error) {
-    return { error: (error as { message?: string }).message ?? 'Failed to create event' }
-  }
-  // Supabase returns scalar uuid as a plain string, but guard against objects
-  const id = typeof data === 'string' ? data : (data as Record<string, string> | null)?.id ?? null
-  if (!id) return { error: 'RPC returned no ID — check Netlify logs' }
-  return { id }
+  return r.kind === 'ok' && typeof r.data === 'string' ? { ok: true, id: r.data } : { ok: false, reason: 'failed' }
 }
 
-export async function updateEvent(id: string, patch: Partial<EventInsert>): Promise<boolean> {
-  const current = await getAdminEvent(id)
-  if (!current) return false
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any).rpc('admin_update_event', {
+/** Changes only the fields in `patch`. Not atomic: reads the event, then writes it back (candidate #3). */
+export async function updateEvent(id: string, patch: Partial<EventInsert>): Promise<EventWrite<'not_found'>> {
+  const read = await callDb<Event[]>('admin_get_event', { p_id: id })
+  if (read.kind !== 'ok') return { ok: false, reason: 'failed' }
+  const current = read.data?.[0]
+  if (!current) return { ok: false, reason: 'not_found' }
+  const r = await callDb('admin_update_event', {
     p_id:                  id,
-    p_name:                patch.name               ?? current.name,
-    p_date_time:           patch.date_time          ?? current.date_time,
-    p_venue:               patch.venue              ?? current.venue,
-    p_description:         patch.description        ?? current.description,
-    p_cover_image_url:     patch.cover_image_url    ?? current.cover_image_url,
+    p_name:                patch.name                ?? current.name,
+    p_date_time:           patch.date_time           ?? current.date_time,
+    p_venue:               patch.venue               ?? current.venue,
+    p_description:         patch.description         ?? current.description,
+    p_cover_image_url:     patch.cover_image_url !== undefined ? patch.cover_image_url : current.cover_image_url,
     p_max_per_reservation: patch.max_per_reservation ?? current.max_per_reservation,
-    p_gate_pin:            patch.gate_pin           ?? current.gate_pin,
-    p_status:              patch.status             ?? current.status,
+    p_gate_pin:            patch.gate_pin            ?? current.gate_pin,
+    p_status:              patch.status              ?? current.status,
   })
-  if (error) console.error('[updateEvent] rpc error:', error)
-  return !error
+  return r.kind === 'ok' ? { ok: true } : { ok: false, reason: 'failed' }
 }
 
-export async function closeEvent(id: string): Promise<boolean> {
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any).rpc('admin_close_event', { p_id: id })
-  if (error) console.error('[closeEvent] rpc error:', error)
-  return !error
+export async function closeEvent(id: string): Promise<EventWrite> {
+  const r = await callDb('admin_close_event', { p_id: id })
+  return r.kind === 'ok' ? { ok: true } : { ok: false, reason: 'failed' }
 }
 
-export type EventLifecycleResult = { ok: true } | { ok: false; error: string; status: number }
-
-async function runLifecycleRpc(fn: string, id: string, messages: Record<string, [string, number]>): Promise<EventLifecycleResult> {
-  const supabase = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc(fn, { p_id: id })
-  if (error) {
-    console.error(`[${fn}] rpc error:`, error)
-    return { ok: false, error: 'Something went wrong. Please try again.', status: 500 }
-  }
-  if (data === 'ok') return { ok: true }
-  const [message, status] = messages[data as string] ?? ['Something went wrong. Please try again.', 500]
-  return { ok: false, error: message, status }
+/** The lifecycle functions answer 'ok' or a reason (migration 0011). */
+async function lifecycle<R extends string>(fn: string, id: string, reasons: readonly R[]): Promise<EventWrite<R>> {
+  const r = await callDb<string>(fn, { p_id: id })
+  if (r.kind !== 'ok') return { ok: false, reason: 'failed' }
+  if (r.data === 'ok') return { ok: true }
+  if ((reasons as readonly string[]).includes(r.data)) return { ok: false, reason: r.data as R }
+  console.error(`[${fn}] unexpected answer:`, r.data)
+  return { ok: false, reason: 'failed' }
 }
-
-const NOT_FOUND: [string, number] = ['Event not found', 404]
 
 /** Deletes an event made by mistake. Refused once it has any Reservation. */
 export function deleteEvent(id: string) {
-  return runLifecycleRpc('admin_delete_event', id, {
-    not_found: NOT_FOUND,
-    has_reservations: ['This event has reservations, so it can’t be deleted. Archive it instead.', 409],
-  })
+  return lifecycle('admin_delete_event', id, ['not_found', 'has_reservations'] as const)
 }
 
 /** Hides an ended event from the admin list, keeping all its records. */
 export function archiveEvent(id: string) {
-  return runLifecycleRpc('admin_archive_event', id, { not_found: NOT_FOUND })
+  return lifecycle('admin_archive_event', id, ['not_found'] as const)
 }
 
 /** Brings an archived event back as closed (sales stay shut). */
 export function restoreEvent(id: string) {
-  return runLifecycleRpc('admin_restore_event', id, {
-    not_found: NOT_FOUND,
-    not_archived: ['This event isn’t archived.', 409],
-  })
+  return lifecycle('admin_restore_event', id, ['not_found', 'not_archived'] as const)
 }
