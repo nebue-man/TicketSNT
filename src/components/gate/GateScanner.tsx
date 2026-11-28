@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react'
-import type { ScanResult } from '@/lib/data/gate'
+import type { GateDoorCount, ScanResult } from '@/lib/data/gate'
 import { createQrDecoder } from './qr-decoder'
 import { unlockAudio, cueRead, cueAdmitted, cueProblem } from './gate-feedback'
 import { useGateOffline } from './useGateOffline'
@@ -16,10 +16,18 @@ type ScanOutcome =
   | { kind: 'denied'; reservationId: string; message: string } // Not admitted, with reason
   | { kind: 'not_checked'; reservationId: string }             // network failure / timeout
 
+/** The Door count shown with a Scan outcome (GLOSSARY.md: Door count). */
+type ShownDoorCount =
+  | { kind: 'live'; count: GateDoorCount }    // sent with this Scan's response
+  | { kind: 'stale'; count: GateDoorCount }   // last one received; this Scan didn't reach the server
+  | { kind: 'offline'; count: GateDoorCount } // approximate, from this phone's Gate list
+  | { kind: 'unavailable' }                   // count failed, or the PIN couldn't be checked
+  | { kind: 'hidden' }                        // wrong PIN: no section at all
+
 type View =
   | { phase: 'scan' }
   | { phase: 'checking'; reservationId: string }
-  | { phase: 'result'; outcome: ScanOutcome }
+  | { phase: 'result'; outcome: ScanOutcome; doorCount: ShownDoorCount }
 
 const SCAN_TIMEOUT_MS = 5000
 const SAME_TICKET_GUARD_MS = 3000
@@ -46,6 +54,15 @@ function setMuted(muted: boolean) {
   muteListeners.forEach(l => l())
 }
 
+/** Reads `doorCount` from a scan response: absent means hidden, null means unavailable. */
+function toGateDoorCount(data: unknown): GateDoorCount | null | undefined {
+  if (!data || typeof data !== 'object' || !('doorCount' in data)) return undefined
+  const c = (data as { doorCount: unknown }).doorCount as Partial<GateDoorCount> | null
+  return c && Number.isFinite(c.ticketsAdmitted) && Number.isFinite(c.ticketsSold)
+    ? { ticketsAdmitted: c.ticketsAdmitted!, ticketsSold: c.ticketsSold! }
+    : null
+}
+
 function outcomeReservationId(outcome: ScanOutcome): string {
   return outcome.kind === 'admitted' ? outcome.result.reservation.id : outcome.reservationId
 }
@@ -66,8 +83,9 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
   const muted = useSyncExternalStore(subscribeMute, isMuted, () => false)
   const offline = useGateOffline(eventId, pin)
   const offlineMode = offline.state.mode === 'offline'
-  const { scanOffline } = offline
+  const { scanOffline, offlineCount } = offline
 
+  const lastCountRef = useRef<GateDoorCount | null>(null) // last live Door count, for "Not checked"
   const videoRef = useRef<HTMLVideoElement>(null)
   const busyRef = useRef(false) // true while checking or showing a result: decoding is paused
   const ignoreRef = useRef<{ id: string; until: number } | null>(null)
@@ -87,7 +105,8 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
       const outcome = fromOfflineOutcome(scanOffline(reservationId))
       if (outcome.kind === 'admitted' && !outcome.result.alreadyScanned) cueAdmitted(isMuted())
       else cueProblem(isMuted())
-      setView({ phase: 'result', outcome })
+      const count = offlineCount()
+      setView({ phase: 'result', outcome, doorCount: count ? { kind: 'offline', count } : { kind: 'unavailable' } })
       return
     }
 
@@ -96,6 +115,7 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), SCAN_TIMEOUT_MS)
     let outcome: ScanOutcome
+    let doorCount: ShownDoorCount
     try {
       const res = await fetch('/api/gate/scan', {
         method: 'POST',
@@ -107,16 +127,21 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
       outcome = res.ok
         ? { kind: 'admitted', result: data as AdmittedResult }
         : { kind: 'denied', reservationId, message: DENIED_MESSAGES[data?.error] ?? 'Something went wrong' }
+      const count = toGateDoorCount(data)
+      if (count) lastCountRef.current = count
+      doorCount = count ? { kind: 'live', count } : count === null ? { kind: 'unavailable' } : { kind: 'hidden' }
     } catch {
       outcome = { kind: 'not_checked', reservationId }
+      const last = lastCountRef.current
+      doorCount = last ? { kind: 'stale', count: last } : { kind: 'unavailable' }
     } finally {
       clearTimeout(timer)
     }
 
     if (outcome.kind === 'admitted' && !outcome.result.alreadyScanned) cueAdmitted(isMuted())
     else cueProblem(isMuted())
-    setView({ phase: 'result', outcome })
-  }, [eventId, pin, offlineMode, scanOffline])
+    setView({ phase: 'result', outcome, doorCount })
+  }, [eventId, pin, offlineMode, scanOffline, offlineCount])
 
   const checkRef = useRef(check)
   useEffect(() => { checkRef.current = check }, [check])
@@ -293,6 +318,7 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
       {view.phase === 'result' && (
         <OutcomeScreen
           outcome={view.outcome}
+          doorCount={view.doorCount}
           onScanNext={scanNext}
           onRetry={retry}
           onGoOffline={offline.state.list ? goOfflineAndScan : undefined}
@@ -303,8 +329,9 @@ export function GateScanner({ eventId, pin }: { eventId: string; pin: string }) 
   )
 }
 
-function OutcomeScreen({ outcome, onScanNext, onRetry, onGoOffline, goingOffline }: {
+function OutcomeScreen({ outcome, doorCount, onScanNext, onRetry, onGoOffline, goingOffline }: {
   outcome: ScanOutcome
+  doorCount: ShownDoorCount
   onScanNext: () => void
   onRetry: (reservationId: string) => void
   onGoOffline?: () => void
@@ -356,6 +383,7 @@ function OutcomeScreen({ outcome, onScanNext, onRetry, onGoOffline, goingOffline
       </div>
 
       <div className="max-w-[480px] w-full mx-auto flex flex-col gap-3 pt-6">
+        <DoorCountSection doorCount={doorCount} fg={fg} />
         {retryId && (
           <button onClick={() => onRetry(retryId)} className="btn btn-lg btn-block" style={filled}>
             Retry
@@ -372,6 +400,41 @@ function OutcomeScreen({ outcome, onScanNext, onRetry, onGoOffline, goingOffline
         </button>
       </div>
     </div>
+  )
+}
+
+/** The Door count, pinned above the buttons on every Scan outcome, in the screen's ink colour. */
+function DoorCountSection({ doorCount, fg }: { doorCount: ShownDoorCount; fg: string }) {
+  if (doorCount.kind === 'hidden') return null
+  const rule = `color-mix(in srgb, ${fg} 18%, transparent)`
+
+  if (doorCount.kind === 'unavailable') {
+    return (
+      <section aria-label="Door count" className="pt-4 pb-1 text-[16px]" style={{ borderTop: `1px solid ${rule}` }}>
+        <span style={{ opacity: 0.7 }}>Door count unavailable</span>
+      </section>
+    )
+  }
+
+  const { ticketsAdmitted, ticketsSold } = doorCount.count
+  const pct = ticketsSold > 0 ? Math.min(100, (ticketsAdmitted / ticketsSold) * 100) : 0
+  const note = doorCount.kind === 'offline' ? 'offline, this phone only'
+    : doorCount.kind === 'stale' ? 'not updated' : null
+
+  return (
+    <section aria-label="Door count" className="pt-4 pb-1" style={{ borderTop: `1px solid ${rule}` }}>
+      <div className="flex justify-between items-baseline gap-4 mb-2">
+        <span className="text-[14px] font-medium uppercase tracking-[0.08em]" style={{ opacity: 0.7 }}>Door count</span>
+        {note && <span className="text-[14px]" style={{ opacity: 0.7 }}>{note}</span>}
+      </div>
+      <p className="tabular-nums text-[28px] font-medium leading-[1.1] tracking-[-0.02em] mb-3">
+        {doorCount.kind === 'offline' && '≈ '}{ticketsAdmitted.toLocaleString()}
+        <span className="text-[18px]" style={{ opacity: 0.7 }}> / {ticketsSold.toLocaleString()} admitted</span>
+      </p>
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: rule }} role="presentation">
+        <div className="h-full origin-left" style={{ background: fg, transform: `scaleX(${pct / 100})` }} />
+      </div>
+    </section>
   )
 }
 

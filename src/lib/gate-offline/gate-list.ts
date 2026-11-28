@@ -2,6 +2,8 @@
 // Doors, and how an Offline scan is decided from it. Pure — no storage, no
 // network — so it runs the same on the phone and in tests.
 
+import type { GateDoorCount } from '@/lib/data/gate'
+
 export interface GateListItem {
   ticket_type_name: string
   quantity: number
@@ -67,6 +69,24 @@ export function countTickets(list: GateList): number {
     if (!entry.void) for (const item of entry.items) n += item.quantity
   }
   return n
+}
+
+/**
+ * The approximate Door count a phone in offline mode can know (GLOSSARY.md):
+ * Admissions in its Gate list plus its own Offline scans. Other phones'
+ * Offline scans are missing, so it can only undercount.
+ */
+export function offlineDoorCount(
+  list: GateList,
+  offlineScans: readonly OfflineScan[],
+): GateDoorCount {
+  const ownScans = new Set(offlineScans.map(s => s.reservationId))
+  let ticketsAdmitted = 0
+  for (const [id, entry] of Object.entries(list.reservations)) {
+    if (!entry.admittedAt && !ownScans.has(id)) continue
+    for (const item of entry.items) ticketsAdmitted += item.quantity
+  }
+  return { ticketsAdmitted, ticketsSold: countTickets(list) }
 }
 
 /** Maps the gate_get_list payload. Returns null if it isn't a usable list. */

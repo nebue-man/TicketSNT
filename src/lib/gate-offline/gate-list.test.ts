@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { decideOfflineScan, isGateListExpired, countTickets, toGateList, type GateList } from './gate-list'
+import { decideOfflineScan, isGateListExpired, countTickets, offlineDoorCount, toGateList, type GateList } from './gate-list'
 
 const list: GateList = {
   eventId: 'ev1',
@@ -67,5 +67,22 @@ describe('toGateList', () => {
   it('rejects an error payload', () => {
     expect(toGateList({ code: 'invalid_pin' })).toBeNull()
     expect(toGateList(null)).toBeNull()
+  })
+})
+
+describe('offlineDoorCount', () => {
+  it('counts tickets admitted when the list was downloaded, out of tickets sold', () => {
+    // Bina's 1 VIP was admitted before download; Chen's 4 are void, so not sold.
+    expect(offlineDoorCount(list, [])).toEqual({ ticketsAdmitted: 1, ticketsSold: 3 })
+  })
+
+  it("adds every ticket in this phone's own Offline scans", () => {
+    const scans = [{ reservationId: 'RES-AAAAAA', scannedAt: '2026-12-01T13:40:00Z' }]
+    expect(offlineDoorCount(list, scans)).toEqual({ ticketsAdmitted: 3, ticketsSold: 3 })
+  })
+
+  it('does not count a Reservation twice when it was admitted before download and scanned again', () => {
+    const scans = [{ reservationId: 'RES-BBBBBB', scannedAt: '2026-12-01T13:40:00Z' }]
+    expect(offlineDoorCount(list, scans).ticketsAdmitted).toBe(1)
   })
 })
