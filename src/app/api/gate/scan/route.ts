@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { scanReservation } from '@/lib/data/gate'
+import { scanReservation, type GateDoorCount, type ScanResult } from '@/lib/data/gate'
+import { getDoorCount } from '@/lib/data/admin/door-count'
+
+/**
+ * The Door count after this Scan, sent only once the gate PIN is known to be
+ * right: a wrong PIN, or a failure before the PIN was checked, reveals nothing.
+ * null if the count couldn't be loaded; the Scan outcome stands regardless.
+ */
+async function doorCountFor(result: ScanResult, eventId: string): Promise<GateDoorCount | null | undefined> {
+  if (!result.ok && (result.error === 'invalid_pin' || result.error === 'unknown')) return undefined
+  const count = await getDoorCount(eventId)
+  return count && { ticketsAdmitted: count.ticketsAdmitted, ticketsSold: count.ticketsSold }
+}
 
 export async function POST(request: NextRequest) {
   let body: unknown
@@ -15,13 +27,14 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await scanReservation(reservationId.trim().toUpperCase(), eventId, gatePin)
+  const doorCount = await doorCountFor(result, eventId)
 
   if (!result.ok) {
     const status = result.error === 'invalid_pin' ? 403
       : result.error === 'not_found' ? 404
       : 400
-    return NextResponse.json({ error: result.error }, { status })
+    return NextResponse.json({ error: result.error, doorCount }, { status })
   }
 
-  return NextResponse.json(result, { status: 200 })
+  return NextResponse.json({ ...result, doorCount }, { status: 200 })
 }

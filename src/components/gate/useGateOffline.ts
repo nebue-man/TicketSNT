@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { decideOfflineScan, toGateList, type GateList, type OfflineScanOutcome } from '@/lib/gate-offline/gate-list'
+import { decideOfflineScan, offlineDoorCount, toGateList, type GateList, type OfflineScanOutcome } from '@/lib/gate-offline/gate-list'
+import type { GateDoorCount } from '@/lib/data/gate'
 import {
   readGateState, writeGateState, readGatePhone, saveGatePhoneName, gatePhoneLabel,
   EMPTY_GATE_STATE, type GateState, type GatePhone,
@@ -193,5 +194,11 @@ export function useGateOffline(eventId: string, pin: string) {
     return outcome
   }, [commit])
 
-  return { state, phone, action, message, nameThisPhone, download, goOffline, goOnline, scanOffline, dismissMessage: () => setMessage(null) }
+  /** The approximate Door count this phone knows offline, including Offline scans just saved. */
+  const offlineCount = useCallback((): GateDoorCount | null => {
+    const current = stateRef.current
+    return current.list ? offlineDoorCount(current.list, current.scans) : null
+  }, [])
+
+  return { state, phone, action, message, nameThisPhone, download, goOffline, goOnline, scanOffline, offlineCount, dismissMessage: () => setMessage(null) }
 }

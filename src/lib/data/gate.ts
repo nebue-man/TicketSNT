@@ -5,6 +5,12 @@ export type ScanResult =
   | { ok: true; reservation: ScannedReservation; alreadyScanned: true; scannedAt: string }
   | { ok: false; error: 'invalid_pin' | 'not_found' | 'wrong_event' | 'voided' | 'unknown' }
 
+/** The Door count as a Gate phone shows it on the Scan outcome screen. */
+export interface GateDoorCount {
+  ticketsAdmitted: number
+  ticketsSold: number
+}
+
 export interface ScannedReservation {
   id: string
   buyer_name: string
